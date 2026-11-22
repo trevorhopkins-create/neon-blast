@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>LIGHT CYCLES 3D</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    :root {
+      --bg: #05010d;
+      --cyan: #00f6ff;
+      --magenta: #ff2bd6;
+      --violet: #9b5cff;
+      --yellow: #f0ff3d;
+      --ink: #e8f6ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", "Helvetica Neue", Impact, Arial, sans-serif;
+      overflow: hidden;
+      user-select: none;
+      touch-action: none;
+    }
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #05010d;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #scanlines, #vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+    #scanlines {
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.16) 0px,
+        rgba(0, 0, 0, 0.16) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      mix-blend-mode: multiply;
+      opacity: 0.55;
+    }
+    #vignette {
+      background:
+        radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.72) 100%),
+        linear-gradient(to bottom, rgba(255, 43, 214, 0.05), transparent 18%, transparent 82%, rgba(0, 246, 255, 0.07));
+    }
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 5;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 12px 18px 0;
+      pointer-events: none;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      text-shadow: 0 0 8px currentColor, 0 0 18px currentColor;
+    }
+    #hud .left, #hud .right, #hud .center {
+      font-size: 13px;
+      color: var(--cyan);
+    }
+    #hud .center { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; }
+    #hud .score-row { margin-bottom: 4px; white-space: nowrap; }
+    #overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px 16px 120px;
+      background: rgba(2, 0, 10, 0.42);
+    }
+    #overlay.hidden { display: none; }
+    #overlay h1 {
+      font-size: clamp(28px, 7vw, 72px);
+      letter-spacing: 0.22em;
+      font-weight: 800;
+      color: #fff;
+      text-shadow:
+        0 0 8px #00f6ff,
+        0 0 24px #00f6ff,
+        0 0 48px #ff2bd6,
+        0 0 80px #ff2bd6;
+      margin-bottom: 8px;
+    }
+    #overlay .sub {
+      color: var(--magenta);
+      letter-spacing: 0.42em;
+      font-size: 12px;
+      margin-bottom: 28px;
+      text-shadow: 0 0 12px var(--magenta);
+    }
+    #overlay .msg {
+      font-size: clamp(22px, 4vw, 40px);
+      letter-spacing: 0.16em;
+      color: var(--cyan);
+      text-shadow: 0 0 16px var(--cyan), 0 0 32px var(--magenta);
+      margin-bottom: 10px;
+    }
+    #overlay .detail {
+      color: #b9d4e8;
+      letter-spacing: 0.12em;
+      font-size: 14px;
+      margin-bottom: 22px;
+      line-height: 1.6;
+      max-width: 560px;
+      text-shadow: 0 0 8px rgba(0, 246, 255, 0.4);
+    }
+    .btns { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin: 8px 0 22px; }
+    button.neon {
+      pointer-events: auto;
+      cursor: pointer;
+      background: rgba(0, 246, 255, 0.06);
+      color: var(--cyan);
+      border: 2px solid var(--cyan);
+      padding: 12px 22px;
+      letter-spacing: 0.22em;
+      font: 700 13px/1 "Segoe UI", "Helvetica Neue", Impact, Arial, sans-serif;
+      text-transform: uppercase;
+      box-shadow: 0 0 12px rgba(0, 246, 255, 0.45), inset 0 0 12px rgba(0, 246, 255, 0.08);
+      transition: background 0.15s, color 0.15s, transform 0.15s;
+    }
+    button.neon:hover, button.neon:focus {
+      background: var(--cyan);
+      color: #05010d;
+      outline: none;
+      transform: translateY(-1px);
+    }
+    button.neon.mag {
+      color: var(--magenta);
+      border-color: var(--magenta);
+      box-shadow: 0 0 12px rgba(255, 43, 214, 0.45), inset 0 0 12px rgba(255, 43, 214, 0.08);
+    }
+    button.neon.mag:hover, button.neon.mag:focus {
+      background: var(--magenta);
+      color: #05010d;
+    }
+    #touch {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 12px;
+      z-index: 7;
+      display: none;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 0 16px;
+      gap: 12px;
+      pointer-events: none;
+    }
+    #touch.show { display: flex; }
+    @media (pointer: coarse), (max-width: 820px) {
+      #touch { display: flex; }
+      #hud { font-size: 11px; }
+    }
+    .pad {
+      pointer-events: auto;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      border: 2px solid var(--cyan);
+      background: rgba(0, 8, 20, 0.55);
+      color: var(--cyan);
+      font: 700 12px/1 "Segoe UI", sans-serif;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      box-shadow: 0 0 16px rgba(0, 246, 255, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pad.mag {
+      border-color: var(--magenta);
+      color: var(--magenta);
+      box-shadow: 0 0 16px rgba(255, 43, 214, 0.35);
+    }
+    .pad:active, .pad.held {
+      background: rgba(0, 246, 255, 0.28);
+    }
+    .pad.mag:active, .pad.mag.held {
+      background: rgba(255, 43, 214, 0.28);
+    }
+    canvas { position: absolute; inset: 0; }
+    #gl { z-index: 0; display: none; }
+    #c { z-index: 1; }
+    body.three #scanlines { opacity: 0.28; }
+    #big {
+      position: absolute; left: 50%; top: 36%; transform: translate(-50%, -50%);
+      z-index: 5; pointer-events: none; font-weight: 800; color: #fff;
+      font-size: clamp(54px, 11vw, 130px); letter-spacing: 0.12em;
+      text-shadow: 0 0 10px #00f6ff, 0 0 30px #00f6ff, 0 0 60px #ff2bd6;
+    }
+    #hint {
+      position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 5; pointer-events: none; display: none; white-space: nowrap;
+      font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: #9fdcff; text-shadow: 0 0 8px #00f6ff; opacity: 0.9;
+      background: rgba(0, 6, 18, 0.45); padding: 6px 14px; border: 1px solid rgba(0, 246, 255, 0.25);
+    }
+    #hint b { color: #fff; font-weight: 700; }
+    .ebar { display: inline-block; width: 64px; height: 6px; border: 1px solid currentColor; margin-left: 8px;
+      vertical-align: middle; box-shadow: 0 0 6px currentColor; }
+    .ebar i { display: block; height: 100%; background: currentColor; }
+    .tag { display: inline-block; padding: 2px 8px; border: 1px solid currentColor; margin-left: 6px; }
+    .diff-label { color: #b9d4e8; letter-spacing: 0.3em; font-size: 11px; margin-top: 2px; }
+    button.neon.lvl { min-width: 112px; }
+    button.neon.lvl.easy { color: #00ff87; border-color: #00ff87; box-shadow: 0 0 10px rgba(0,255,135,.4); }
+    button.neon.lvl.medium { color: #f0ff3d; border-color: #f0ff3d; box-shadow: 0 0 10px rgba(240,255,61,.4); }
+    button.neon.lvl.hard { color: #ff2a6d; border-color: #ff2a6d; box-shadow: 0 0 10px rgba(255,42,109,.4); }
+    button.neon.lvl.sel, button.neon.lvl:hover, button.neon.lvl:focus { background: currentColor; }
+    button.neon.lvl.sel::after { content: ' ◆'; }
+    button.neon.lvl.sel { color: inherit; }
+    button.neon.lvl.easy.sel, button.neon.lvl.easy:hover { background: #00ff87; color: #05010d; }
+    button.neon.lvl.medium.sel, button.neon.lvl.medium:hover { background: #f0ff3d; color: #05010d; }
+    button.neon.lvl.hard.sel, button.neon.lvl.hard:hover { background: #ff2a6d; color: #05010d; }
+    #loading { position: absolute; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center;
+      color: #00f6ff; letter-spacing: 0.4em; font-size: 13px; text-shadow: 0 0 10px #00f6ff; background: #05010d; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="gl"></canvas>
+    <canvas id="c"></canvas>
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+    <div id="hud">
+      <div class="left" id="hudLeft"></div>
+      <div class="center" id="hudCenter"></div>
+      <div class="right" id="hudRight"></div>
+    </div>
+    <div id="big"></div>
+    <div id="hint"></div>
+    <div id="overlay" class="hidden"></div>
+    <div id="touch">
+      <button class="pad" id="btnLeft" type="button">Left</button>
+      <button class="pad mag" id="btnTrail" type="button">Ghost</button>
+      <button class="pad" id="btnRight" type="button">Right</button>
+    </div>
+    <div id="loading">LOADING GRID…</div>
+  </div>
+  <script type="module">
+    /* ============================================================
+       LIGHT CYCLES 3D — single-file build.
+       three.js loads from the unpkg CDN (needs internet on first load).
+       If it can't load, Light Cycles falls back to a flat 2D renderer.
+       ============================================================ */
+    let THREE = null, EffectComposer = null, RenderPass = null, UnrealBloomPass = null, OutputPass = null, Reflector = null;
+    async function loadThree() {
+      const timeout = new Promise(function (_, rej) { setTimeout(function () { rej(new Error('three.js load timeout')); }, 15000); });
+      const all = Promise.all([
+        import('three'),
+        import('three/addons/postprocessing/EffectComposer.js'),
+        import('three/addons/postprocessing/RenderPass.js'),
+        import('three/addons/postprocessing/UnrealBloomPass.js'),
+        import('three/addons/postprocessing/OutputPass.js'),
+        import('three/addons/objects/Reflector.js')
+      ]);
+      const m = await Promise.race([all, timeout]);
+      THREE = m[0];
+      EffectComposer = m[1].EffectComposer;
+      RenderPass = m[2].RenderPass;
+      UnrealBloomPass = m[3].UnrealBloomPass;
+      OutputPass = m[4].OutputPass;
+      Reflector = m[5].Reflector;
+    }
+    try { await loadThree(); } catch (err) { console.warn('3D engine unavailable, using 2D fallback:', err && err.message); THREE = null; }
+    document.getElementById('loading').remove();
+
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const glCanvas = document.getElementById('gl');
+    const overlay = document.getElementById('overlay');
+    const hudLeft = document.getElementById('hudLeft');
+    const hudCenter = document.getElementById('hudCenter');
+    const hudRight = document.getElementById('hudRight');
+    const bigEl = document.getElementById('big');
+    const hintEl = document.getElementById('hint');
+    const touchBar = document.getElementById('touch');
+    const btnLeft = document.getElementById('btnLeft');
+    const btnRight = document.getElementById('btnRight');
+    const btnTrail = document.getElementById('btnTrail');
+
+    var W = 0, H = 0, DPR = 1;
+    var mode = 'menu';
+    var lastTs = 0;
+    var keys = Object.create(null);
+    var actx = null;
+
+    var COL = {
+      cyan: '#00f6ff',
+      magenta: '#ff2bd6',
+      yellow: '#f0ff3d',
+      green: '#00ff87',
+      orange: '#ff6b00',
+      violet: '#9b5cff',
+      white: '#e8f6ff',
+      red: '#ff2a6d',
+      gold: '#ffd319',
+      purple: '#b967ff'
+    };
+
+    function resize() {
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function ensureAudio() {
+      try {
+        if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+        if (actx.state === 'suspended') actx.resume();
+      } catch (e) {}
+    }
+
+    function beep(freq, dur, type, vol, slide) {
+      if (!actx) return;
+      try {
+        var o = actx.createOscillator();
+        var g = actx.createGain();
+        o.type = type || 'square';
+        o.frequency.setValueAtTime(freq, actx.currentTime);
+        if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, slide), actx.currentTime + dur);
+        g.gain.setValueAtTime(vol || 0.05, actx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+        o.connect(g);
+        g.connect(actx.destination);
+        o.start();
+        o.stop(actx.currentTime + dur + 0.02);
+      } catch (e) {}
+    }
+
+    function pulse(color, x, y, r, blur) {
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = blur == null ? 18 : blur;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function glowStroke(color, width, blur, drawFn) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = blur;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      drawFn();
+      ctx.restore();
+    }
+
+    /* ---------- synthwave backdrop (menu + ship dodge) ---------- */
+    var gridScroll = 0;
+
+    function drawSun(cx, cy, r) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.clip();
+      var g = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r);
+      g.addColorStop(0, '#fff5c8');
+      g.addColorStop(0.25, '#ff7ad9');
+      g.addColorStop(0.7, '#ff2bd6');
+      g.addColorStop(1, 'rgba(80, 10, 60, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      var i, y, t;
+      for (i = 0; i < 8; i++) {
+        t = i / 8;
+        y = cy - r * 0.12 + t * r * 1.15;
+        ctx.fillStyle = 'rgba(14, 2, 32, ' + (0.35 + t * 0.55) + ')';
+        ctx.fillRect(cx - r, y, r * 2, 2 + t * 7);
+      }
+      ctx.restore();
+    }
+
+    function drawSynthworld(dt, speed, accent) {
+      gridScroll += dt * speed;
+      var horizon = Math.floor(H * 0.38);
+      var vpX = W * 0.5;
+
+      var sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, '#090014');
+      sky.addColorStop(0.32, '#1a0538');
+      sky.addColorStop(0.38, '#3a0a4a');
+      sky.addColorStop(0.381, '#0a0020');
+      sky.addColorStop(1, '#05010d');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+
+      drawSun(vpX, horizon - 8, Math.min(W, H) * 0.16);
+
+      glowStroke(accent || COL.magenta, 2, 16, function () {
+        ctx.beginPath();
+        ctx.moveTo(0, horizon);
+        ctx.lineTo(W, horizon);
+        ctx.stroke();
+      });
+
+      var far = 28;
+      var near = 0.7;
+      var z, y, x, k, offset, lines, alpha;
+      offset = (gridScroll % 1);
+      ctx.save();
+      for (k = 0; k < 22; k++) {
+        z = near + (k + offset) / 22 * (far - near);
+        y = horizon + (H - horizon) * (0.85 / z);
+        if (y > H + 2) continue;
+        alpha = Math.min(0.85, 0.12 + (1 - k / 22) * 0.55);
+        ctx.strokeStyle = 'rgba(0, 246, 255,' + alpha + ')';
+        ctx.shadowColor = COL.cyan;
+        ctx.shadowBlur = 8;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
+      }
+      lines = 18;
+      for (k = -lines; k <= lines; k++) {
+        x = k * 0.85;
+        ctx.beginPath();
+        var z0 = near, z1 = far;
+        var s0 = 1 / z0, s1 = 1 / z1;
+        ctx.moveTo(vpX + x * (H * 0.55) * s1, horizon + (H - horizon) * 0.85 * s1);
+        ctx.lineTo(vpX + x * (H * 0.55) * s0, horizon + (H - horizon) * 0.85 * s0);
+        ctx.strokeStyle = 'rgba(0, 246, 255, 0.32)';
+        ctx.shadowColor = COL.cyan;
+        ctx.shadowBlur = 8;
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      var vig = ctx.createRadialGradient(vpX, H * 0.55, H * 0.1, vpX, H * 0.55, H * 0.85);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, 'rgba(0,0,0,0.18)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    /* ---------- particles ---------- */
+    var particles = [];
+
+    function burst(x, y, color, n, power) {
+      var i, a, s;
+      n = n || 28;
+      power = power || 180;
+      for (i = 0; i < n; i++) {
+        a = Math.random() * Math.PI * 2;
+        s = (0.3 + Math.random()) * power;
+        particles.push({
+          x: x, y: y,
+          vx: Math.cos(a) * s,
+          vy: Math.sin(a) * s,
+          life: 0.5 + Math.random() * 0.6,
+          max: 0.7 + Math.random() * 0.5,
+          color: color,
+          size: 1.5 + Math.random() * 2.8
+        });
+      }
+    }
+
+    function updateParticles(dt) {
+      var i, p;
+      for (i = particles.length - 1; i >= 0; i--) {
+        p = particles[i];
+        p.life -= dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function drawParticles() {
+      var i, p, a;
+      for (i = 0; i < particles.length; i++) {
+        p = particles[i];
+        a = Math.max(0, p.life / p.max);
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x - p.size * 0.5, p.y - p.size * 0.5, p.size, p.size);
+        ctx.restore();
+      }
+    }
+
+    /* ---------- settings ---------- */
+    const COLS = 120, ROWS = 80;
+    const DIFFS = {
+      easy:   { key: 'easy',   name: 'EASY',   color: '#00ff87', tickMs: 88, lifeMs: 4000, look: 8,  flood: 45,  mistake: 0.09,  react: 2, cutoff: false, ghostChance: 0.25 },
+      medium: { key: 'medium', name: 'MEDIUM', color: '#f0ff3d', tickMs: 70, lifeMs: 5000, look: 16, flood: 150, mistake: 0.02,  react: 3, cutoff: false, ghostChance: 0.35 },
+      hard:   { key: 'hard',   name: 'HARD',   color: '#ff2a6d', tickMs: 56, lifeMs: 6000, look: 28, flood: 360, mistake: 0.0,   react: 4, cutoff: true,  ghostChance: 0.45 }
+    };
+    const SPEEDS = [null, { name: 'SLOW', mul: 1.25 }, { name: 'NORMAL', mul: 1 }, { name: 'FAST', mul: 0.8 }];
+    const GHOST_DRAIN = 0.42;   // energy / second while ghosting (full bar ~2.4 s)
+    const GHOST_REGEN = 0.16;   // energy / second while trail is on
+    const GHOST_MIN = 0.15;     // energy needed to switch ghost on
+    var difficulty = 'medium';
+    var speedIdx = 2;
+    var viewMode = 'chase';     // 'chase' | 'overhead' (2P always overhead)
+    var autopilot = false;      // test hook: human bike drives itself
+
+    /* ---------- input ---------- */
+    function isTypingTarget(el) {
+      if (!el) return false;
+      var tag = (el.tagName || '').toLowerCase();
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+    }
+
+    function setDifficulty(d) {
+      if (!DIFFS[d]) return;
+      difficulty = d;
+      beep(d === 'easy' ? 440 : d === 'medium' ? 560 : 700, 0.07, 'square', 0.035);
+      applyTiming();
+      if (mode === 'menu') showMenu();
+      else if (mode === 'cycles-over') refreshOverScreen();
+      else if (mode === 'dodge-over') { dodge.best = loadDodgeBest(); showDodgeOver(); }
+      updateCyclesHud();
+    }
+
+    window.addEventListener('keydown', function (e) {
+      if (isTypingTarget(e.target)) return;
+      keys[e.code] = true;
+      ensureAudio();
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].indexOf(e.code) !== -1) e.preventDefault();
+      if (mode === 'menu') {
+        if (e.code === 'Digit1' || e.code === 'Numpad1' || e.code === 'Enter') startCycles(1);
+        else if (e.code === 'Digit2' || e.code === 'Numpad2') startCycles(2);
+        else if (e.code === 'KeyG' || e.code === 'Digit3' || e.code === 'Numpad3') startDodge();
+        else if (e.code === 'KeyE') setDifficulty('easy');
+        else if (e.code === 'KeyM') setDifficulty('medium');
+        else if (e.code === 'KeyH') setDifficulty('hard');
+      } else if (mode === 'cycles' || mode === 'cycles-go') {
+        cyclesKey(e);
+      } else if (mode === 'cycles-over') {
+        if (e.code === 'Enter' || e.code === 'KeyR') startCycles(cycles.humanCount, true);
+        else if (e.code === 'Escape') showMenu();
+        else if (e.code === 'KeyE') setDifficulty('easy');
+        else if (e.code === 'KeyM') setDifficulty('medium');
+        else if (e.code === 'KeyH') setDifficulty('hard');
+        else if (e.code === 'KeyC') toggleView();
+      } else if (mode === 'dodge-over') {
+        if (e.code === 'Enter' || e.code === 'KeyR') startDodge(true);
+        else if (e.code === 'Escape') showMenu();
+        else if (e.code === 'KeyE') setDifficulty('easy');
+        else if (e.code === 'KeyM') setDifficulty('medium');
+        else if (e.code === 'KeyH') setDifficulty('hard');
+      } else if (mode === 'dodge') {
+        if (e.code === 'Escape') showMenu();
+      }
+    });
+
+    window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+    window.addEventListener('pointerdown', ensureAudio, { once: false });
+
+    function bindHold(btn, onDown, onUp) {
+      var held = false;
+      function down(ev) { ev.preventDefault(); ensureAudio(); held = true; btn.classList.add('held'); if (onDown) onDown(); }
+      function up(ev) { if (ev) ev.preventDefault(); if (!held) return; held = false; btn.classList.remove('held'); if (onUp) onUp(); }
+      btn.addEventListener('pointerdown', down);
+      btn.addEventListener('pointerup', up);
+      btn.addEventListener('pointerleave', up);
+      btn.addEventListener('pointercancel', up);
+    }
+
+    var touchLeft = false, touchRight = false;
+    bindHold(btnLeft, function () {
+      touchLeft = true;
+      if (mode === 'cycles' || mode === 'cycles-go') humanSteer(1, 'rel', -1);
+    }, function () { touchLeft = false; });
+    bindHold(btnRight, function () {
+      touchRight = true;
+      if (mode === 'cycles' || mode === 'cycles-go') humanSteer(1, 'rel', 1);
+    }, function () { touchRight = false; });
+    bindHold(btnTrail, function () {
+      if (mode === 'cycles' || mode === 'cycles-go') toggleGhost(1);
+    }, null);
+    window.addEventListener('touchstart', function () { touchBar.classList.add('show'); }, { once: true, passive: true });
+
+    /* ---------- overlay / menu ---------- */
+    function setOverlay(html) {
+      overlay.innerHTML = html;
+      overlay.classList.remove('hidden');
+      var buttons = overlay.querySelectorAll('button[data-act]');
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].addEventListener('click', function (ev) {
+          var act = ev.currentTarget.getAttribute('data-act');
+          ensureAudio();
+          if (act === 'c1') startCycles(1);
+          if (act === 'c2') startCycles(2);
+          if (act === 'dodge') startDodge();
+          if (act === 'menu') showMenu();
+          if (act.indexOf('d-') === 0) setDifficulty(act.slice(2));
+          if (act === 'again' && mode === 'cycles-over') startCycles(cycles.humanCount, true);
+          if (act === 'again' && mode === 'dodge-over') startDodge(true);
+        });
+      }
+    }
+
+    function diffButtons() {
+      return '<div class="btns">' + ['easy', 'medium', 'hard'].map(function (k) {
+        return '<button class="neon lvl ' + k + (difficulty === k ? ' sel' : '') + '" data-act="d-' + k + '" type="button">' +
+          DIFFS[k].name + '</button>';
+      }).join('') + '</div>';
+    }
+
+    function showMenu() {
+      mode = 'menu';
+      particles.length = 0;
+      clearCycles3D();
+      setView3D(false);
+      btnTrail.style.visibility = 'visible';
+      hudLeft.textContent = '';
+      hudCenter.textContent = '';
+      hudRight.textContent = '';
+      bigEl.textContent = '';
+      hintEl.style.display = 'none';
+      setOverlay(
+        '<h1>LIGHT CYCLES 3D</h1>' +
+        '<div class="sub">GRID PROTOCOL' + (THREE ? '' : ' · 2D FALLBACK (OFFLINE)') + '</div>' +
+        '<div class="diff-label">LEVEL &nbsp;·&nbsp; E / M / H</div>' +
+        diffButtons() +
+        '<div class="btns">' +
+          '<button class="neon" data-act="c1" type="button">1 Player</button>' +
+          '<button class="neon" data-act="c2" type="button">2 Players</button>' +
+          '<button class="neon mag" data-act="dodge" type="button">Ship Dodge</button>' +
+        '</div>' +
+        '<div class="detail">' +
+          'LIGHT CYCLES — Enter / 1 = 1 player, 2 = 2 players. P1: arrows (or A / D) steer, Space ghost mode<br>' +
+          'P2: W A S D steer, Q ghost &nbsp;·&nbsp; trails fade after a few seconds &nbsp;·&nbsp; C swaps chase / overhead camera<br>' +
+          'SHIP DODGE — 3 or G &nbsp;·&nbsp; arrows or A / D to steer, grab orbs, 3 lives' +
+        '</div>'
+      );
+    }
+
+    /* ============================================================
+       MODE 1 — LIGHT CYCLES (grid sim, tick based)
+       ============================================================ */
+    var cycles = {
+      riders: [],
+      humanCount: 1,
+      tickAcc: 0,
+      tickMs: 70,
+      lifeTicks: 70,
+      phase: 'countdown',
+      countT: 0,
+      countVal: 3,
+      scores: {},
+      round: 0,
+      lastTitle: '', lastColor: '', lastDetail: ''
+    };
+    var tickNo = 0;
+    const birth = new Int32Array(COLS * ROWS);
+    const owner = new Int8Array(COLS * ROWS);
+    const visit = new Int32Array(COLS * ROWS);
+    var visitStamp = 1;
+    const floodStack = new Int32Array(COLS * ROWS);
+
+    var DIRS = [{ x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }];
+
+    function applyTiming() {
+      var D = DIFFS[difficulty];
+      cycles.tickMs = Math.round(D.tickMs * SPEEDS[speedIdx].mul);
+      cycles.lifeTicks = Math.max(10, Math.round(D.lifeMs / cycles.tickMs));
+    }
+
+    function inArena(x, y) { return x >= 0 && y >= 0 && x < COLS && y < ROWS; }
+    function liveAt(i) { return tickNo - birth[i] < cycles.lifeTicks; }
+    function blocked(x, y) { return !inArena(x, y) || liveAt(y * COLS + x); }
+
+    function makeRider(id, name, color, x, y, dir, human, playerNum) {
+      if (cycles.scores[id] == null) cycles.scores[id] = 0;
+      return {
+        id: id, name: name, color: color,
+        x: x, y: y, px: x, py: y, dir: dir, queue: [],
+        trailOn: true, energy: 1, alive: true,
+        human: human, playerNum: playerNum || 0,
+        pieces: [], aiToggleT: 1 + Math.random() * 2,
+        yaw: dirYaw(dir), yawVel: 0, lean: 0, view: null, deadT: 0
+      };
+    }
+
+    function startCycles(humanCount, keepScores) {
+      cycles.humanCount = humanCount;
+      if (!keepScores) { cycles.scores = {}; cycles.round = 0; }
+      cycles.round++;
+      applyTiming();
+      birth.fill(-1000000);
+      owner.fill(0);
+      tickNo = 0;
+      particles.length = 0;
+      var cx = COLS / 2, cy = ROWS / 2, inset = 13;
+      var riders = [];
+      riders.push(makeRider('p1', 'CYAN', COL.cyan, cx, ROWS - inset, 0, true, 1));
+      if (humanCount === 2) {
+        riders.push(makeRider('p2', 'MAGENTA', COL.magenta, cx - 1, inset, 2, true, 2));
+        riders.push(makeRider('cpu1', 'GOLD', COL.gold, inset, cy, 1, false, 0));
+        riders.push(makeRider('cpu2', 'LIME', COL.green, COLS - inset, cy - 1, 3, false, 0));
+      } else {
+        riders.push(makeRider('cpu1', 'RED', COL.red, cx - 1, inset, 2, false, 0));
+        riders.push(makeRider('cpu2', 'GOLD', COL.gold, inset, cy, 1, false, 0));
+        riders.push(makeRider('cpu3', 'VIOLET', COL.purple, COLS - inset, cy - 1, 3, false, 0));
+      }
+      cycles.riders = riders;
+      cycles.tickAcc = 0;
+      cycles.phase = 'countdown';
+      cycles.countT = 0;
+      cycles.countVal = 3;
+      mode = 'cycles-go';
+      btnTrail.style.visibility = 'visible';
+      overlay.classList.add('hidden');
+      setView3D(!!THREE);
+      if (THREE) buildRiders3D();
+      beep(220, 0.12, 'square', 0.04);
+      updateHint();
+      updateCyclesHud();
+    }
+
+    function useOverhead() { return cycles.humanCount === 2 || viewMode === 'overhead'; }
+
+    function toggleView() {
+      if (cycles.humanCount === 2) return;
+      viewMode = viewMode === 'chase' ? 'overhead' : 'chase';
+      beep(520, 0.05, 'square', 0.03);
+      updateHint();
+      updateCyclesHud();
+    }
+
+    function humanRider(playerNum) {
+      for (var i = 0; i < cycles.riders.length; i++) {
+        var r = cycles.riders[i];
+        if (r.human && r.playerNum === playerNum) return r;
+      }
+      return null;
+    }
+
+    // kind 'rel': val -1 left / +1 right relative to heading. kind 'abs': val is a DIRS index.
+    function humanSteer(playerNum, kind, val) {
+      var r = humanRider(playerNum);
+      if (!r || !r.alive) return;
+      var base = r.queue.length ? r.queue[r.queue.length - 1] : r.dir;
+      var d = kind === 'rel' ? (base + val + 4) % 4 : val;
+      if (d === base || d === (base + 2) % 4) return;
+      if (r.queue.length < 3) r.queue.push(d);
+    }
+
+    function setTrail(r, on) {
+      if (r.trailOn === on) return;
+      r.trailOn = on;
+      if (r.human) beep(on ? 880 : 420, 0.06, 'square', 0.03);
+    }
+
+    function toggleGhost(playerNum) {
+      var r = humanRider(playerNum);
+      if (!r || !r.alive) return;
+      if (r.trailOn && r.energy < GHOST_MIN) { beep(150, 0.08, 'square', 0.03); return; }
+      setTrail(r, !r.trailOn);
+      updateCyclesHud();
+    }
+
+    var keyHeldToggle = Object.create(null);
+    window.addEventListener('keyup', function (e) { keyHeldToggle[e.code] = false; });
+    function edge(code) { if (keyHeldToggle[code]) return false; keyHeldToggle[code] = true; return true; }
+
+    function cyclesKey(e) {
+      var c = e.code;
+      if (c === 'Escape') { showMenu(); return; }
+      if (c === 'KeyC') { toggleView(); return; }
+      if (c === 'Digit1' || c === 'Digit2' || c === 'Digit3') {
+        speedIdx = Number(c.slice(5));
+        applyTiming();
+        beep(300 + speedIdx * 120, 0.06, 'square', 0.03);
+        updateCyclesHud();
+        return;
+      }
+      if (cycles.humanCount === 2) {
+        if (c === 'ArrowUp') humanSteer(1, 'abs', 0);
+        if (c === 'ArrowRight') humanSteer(1, 'abs', 1);
+        if (c === 'ArrowDown') humanSteer(1, 'abs', 2);
+        if (c === 'ArrowLeft') humanSteer(1, 'abs', 3);
+        if (c === 'KeyW') humanSteer(2, 'abs', 0);
+        if (c === 'KeyD') humanSteer(2, 'abs', 1);
+        if (c === 'KeyS') humanSteer(2, 'abs', 2);
+        if (c === 'KeyA') humanSteer(2, 'abs', 3);
+        if ((c === 'Space' || c === 'ShiftRight' || c === 'Enter') && edge(c)) toggleGhost(1);
+        if (c === 'KeyQ' && edge(c)) toggleGhost(2);
+        return;
+      }
+      if (useOverhead()) {
+        if (c === 'ArrowUp' || c === 'KeyW') humanSteer(1, 'abs', 0);
+        if (c === 'ArrowRight' || c === 'KeyD') humanSteer(1, 'abs', 1);
+        if (c === 'ArrowDown' || c === 'KeyS') humanSteer(1, 'abs', 2);
+        if (c === 'ArrowLeft' || c === 'KeyA') humanSteer(1, 'abs', 3);
+      } else {
+        if (c === 'ArrowLeft' || c === 'KeyA') humanSteer(1, 'rel', -1);
+        if (c === 'ArrowRight' || c === 'KeyD') humanSteer(1, 'rel', 1);
+      }
+      if ((c === 'Space' || c === 'ShiftLeft' || c === 'ShiftRight') && edge(c)) toggleGhost(1);
+    }
+
+    /* ---------- AI ---------- */
+    function occupiedOther(x, y, skip) {
+      for (var i = 0; i < cycles.riders.length; i++) {
+        var r = cycles.riders[i];
+        if (r !== skip && r.alive && r.x === x && r.y === y) return true;
+      }
+      return false;
+    }
+
+    function freeRun(x, y, dir, limit) {
+      var d = DIRS[dir], i;
+      for (i = 0; i < limit; i++) {
+        x += d.x; y += d.y;
+        if (blocked(x, y) || occupiedOther(x, y, null)) return i;
+      }
+      return limit;
+    }
+
+    function floodSpace(sx, sy, limit) {
+      if (blocked(sx, sy)) return 0;
+      visitStamp++;
+      var sp = 0, n = 0, idx, x, y, k, nx, ny, ni;
+      idx = sy * COLS + sx;
+      visit[idx] = visitStamp;
+      floodStack[sp++] = idx;
+      while (sp > 0 && n < limit) {
+        idx = floodStack[--sp];
+        n++;
+        x = idx % COLS; y = (idx / COLS) | 0;
+        for (k = 0; k < 4; k++) {
+          nx = x + DIRS[k].x; ny = y + DIRS[k].y;
+          if (!inArena(nx, ny)) continue;
+          ni = ny * COLS + nx;
+          if (visit[ni] === visitStamp || liveAt(ni)) continue;
+          visit[ni] = visitStamp;
+          floodStack[sp++] = ni;
+        }
+      }
+      return n;
+    }
+
+    function scoreDir(r, dir, D) {
+      var d = DIRS[dir], nx = r.x + d.x, ny = r.y + d.y;
+      if (blocked(nx, ny) || occupiedOther(nx, ny, r)) return -1;
+      return floodSpace(nx, ny, D.flood) * 3 + freeRun(r.x, r.y, dir, D.look) * 2;
+    }
+
+    function aiThink(r) {
+      var D = DIFFS[difficulty];
+      if (Math.random() < D.mistake) return; // lapse in attention: keeps going straight
+      var left = (r.dir + 3) % 4, right = (r.dir + 1) % 4;
+      var ahead = freeRun(r.x, r.y, r.dir, D.look);
+      var opts = [[r.dir, scoreDir(r, r.dir, D)], [left, scoreDir(r, left, D)], [right, scoreDir(r, right, D)]];
+      var best = opts[0], i;
+      for (i = 1; i < 3; i++) if (opts[i][1] > best[1]) best = opts[i];
+      if (best[1] < 0) return; // boxed in
+      var choice = opts[0];
+
+      var target = null;
+      if (D.cutoff) {
+        var bd = 22, j, o, dist;
+        for (j = 0; j < cycles.riders.length; j++) {
+          o = cycles.riders[j];
+          if (o === r || !o.alive) continue;
+          dist = Math.abs(o.x - r.x) + Math.abs(o.y - r.y);
+          if (o.human) dist -= 6; // prefers hunting humans
+          if (dist < bd) { bd = dist; target = o; }
+        }
+      }
+      if (target) {
+        // aim ahead of the target to cut it off
+        var lead = 5 + Math.min(8, (Math.abs(target.x - r.x) + Math.abs(target.y - r.y)) / 3);
+        var tx = target.x + DIRS[target.dir].x * lead, ty = target.y + DIRS[target.dir].y * lead;
+        var bestDist = 1e9;
+        for (i = 0; i < 3; i++) {
+          if (opts[i][1] < 0 || opts[i][1] < best[1] * 0.8) continue;
+          var nx = r.x + DIRS[opts[i][0]].x, ny = r.y + DIRS[opts[i][0]].y;
+          var dd = Math.abs(tx - nx) + Math.abs(ty - ny) + (i === 0 ? -0.5 : 0);
+          if (dd < bestDist) { bestDist = dd; choice = opts[i]; }
+        }
+      } else {
+        var sideBest = opts[1][1] >= opts[2][1] ? opts[1] : opts[2];
+        if (opts[1][1] === opts[2][1] && opts[1][1] > 0 && Math.random() < 0.5) sideBest = opts[2];
+        var threat = ahead <= 1 || (ahead <= D.react && sideBest[1] > opts[0][1] + 8);
+        if (threat || (Math.random() < 0.035 && sideBest[1] > opts[0][1] + 20)) choice = sideBest;
+      }
+      // safety net: never pick a dead end when something much roomier exists
+      if (choice[1] < 0 || choice[1] < best[1] * 0.5) choice = best;
+      r.dir = choice[0];
+
+      // ghost mode usage
+      r.aiToggleT -= cycles.tickMs / 1000;
+      if (r.aiToggleT <= 0) {
+        r.aiToggleT = 0.8 + Math.random() * 2.4;
+        if (r.trailOn && r.energy > 0.6 && Math.random() < D.ghostChance) setTrail(r, false);
+        else if (!r.trailOn && Math.random() < 0.6) setTrail(r, true);
+      }
+    }
+
+    /* ---------- sim tick ---------- */
+    function crashRider(r) {
+      if (!r.alive) return;
+      r.alive = false;
+      r.deadT = 0;
+      if (THREE) explode3D(r);
+      else { var p = cellCenter2D(r.x, r.y); burst(p.x, p.y, r.color, 36, 220); }
+      beep(140, 0.35, 'sawtooth', 0.07, 40);
+    }
+
+    function cyclesTick() {
+      var i, r, nx, ny, key, dest, nexts = [], dt = cycles.tickMs / 1000;
+      tickNo++;
+      for (i = 0; i < cycles.riders.length; i++) {
+        r = cycles.riders[i];
+        if (!r.alive) continue;
+        if (!r.human || autopilot) aiThink(r);
+        else if (r.queue.length) {
+          var q = r.queue.shift();
+          if (q !== (r.dir + 2) % 4) r.dir = q;
+        }
+        if (!r.trailOn) {
+          r.energy -= GHOST_DRAIN * dt;
+          if (r.energy <= 0) { r.energy = 0; setTrail(r, true); }
+        } else {
+          r.energy = Math.min(1, r.energy + GHOST_REGEN * dt);
+        }
+      }
+      for (i = 0; i < cycles.riders.length; i++) {
+        r = cycles.riders[i];
+        if (!r.alive) continue;
+        r.px = r.x; r.py = r.y;
+        if (r.trailOn) {
+          var idx = r.y * COLS + r.x;
+          birth[idx] = tickNo;
+          owner[idx] = i + 1;
+          r.pieces.push({ x: r.x, y: r.y, dir: r.dir, b: tickNo, len: 1 });
+        }
+      }
+      for (i = 0; i < cycles.riders.length; i++) {
+        r = cycles.riders[i];
+        nexts.push(r.alive ? { x: r.x + DIRS[r.dir].x, y: r.y + DIRS[r.dir].y } : null);
+      }
+      dest = Object.create(null);
+      for (i = 0; i < nexts.length; i++) {
+        if (!nexts[i]) continue;
+        key = nexts[i].x + ',' + nexts[i].y;
+        dest[key] = (dest[key] || 0) + 1;
+      }
+      for (i = 0; i < cycles.riders.length; i++) {
+        r = cycles.riders[i];
+        if (!r.alive || !nexts[i]) continue;
+        nx = nexts[i].x; ny = nexts[i].y;
+        var bump = blocked(nx, ny) || dest[nx + ',' + ny] > 1;
+        // head-on swap between two riders
+        for (var j = 0; j < cycles.riders.length && !bump; j++) {
+          var o = cycles.riders[j];
+          if (o !== r && nexts[j] && o.x === nx && o.y === ny && nexts[j].x === r.x && nexts[j].y === r.y) bump = true;
+        }
+        if (bump) {
+          var last = r.pieces[r.pieces.length - 1];
+          if (last && last.b === tickNo) last.len = 0;
+          crashRider(r);
+        } else { r.x = nx; r.y = ny; }
+      }
+      for (i = 0; i < cycles.riders.length; i++) {
+        r = cycles.riders[i];
+        while (r.pieces.length && tickNo - r.pieces[0].b > cycles.lifeTicks + 1) r.pieces.shift();
+      }
+      checkCyclesWinner();
+      updateCyclesHud();
+    }
+
+    function checkCyclesWinner() {
+      var alive = [], i, r, humansAlive = 0;
+      for (i = 0; i < cycles.riders.length; i++) {
+        if (cycles.riders[i].alive) { alive.push(cycles.riders[i]); if (cycles.riders[i].human) humansAlive++; }
+      }
+      if (alive.length === 1) {
+        r = alive[0];
+        cycles.scores[r.id] = (cycles.scores[r.id] || 0) + 1;
+        endCyclesRound(r.name + ' WINS', r.color, r.name + ' takes the grid. Score ' + cycles.scores[r.id]);
+      } else if (alive.length === 0) {
+        endCyclesRound('DRAW', COL.white, 'Everyone derezzed in the same instant.');
+      }
+    }
+
+    function endCyclesRound(title, color, detail) {
+      mode = 'cycles-over';
+      cycles.phase = 'over';
+      cycles.overT = 0;
+      cycles.lastTitle = title; cycles.lastColor = color; cycles.lastDetail = detail;
+      beep(title === 'DRAW' ? 200 : 620, 0.18, 'square', 0.06);
+      setTimeout(function () { beep(title === 'DRAW' ? 160 : 880, 0.22, 'square', 0.05); }, 140);
+      // let the crash play out for a moment before the overlay appears
+      setTimeout(function () { if (mode === 'cycles-over') refreshOverScreen(); }, 900);
+      updateCyclesHud();
+    }
+
+    function refreshOverScreen() {
+      var scores = cycles.riders.map(function (r) {
+        return '<span style="color:' + r.color + ';text-shadow:0 0 8px ' + r.color + '">' + r.name + ' ' + (cycles.scores[r.id] || 0) + '</span>';
+      }).join('&nbsp;&nbsp;');
+      setOverlay(
+        '<div class="msg" style="color:' + cycles.lastColor + '">' + cycles.lastTitle + '</div>' +
+        '<div class="detail">' + cycles.lastDetail + '<br>' + scores + '</div>' +
+        '<div class="diff-label">NEXT ROUND LEVEL &nbsp;·&nbsp; E / M / H</div>' +
+        diffButtons() +
+        '<div class="btns">' +
+          '<button class="neon" data-act="again" type="button">Next Round</button>' +
+          '<button class="neon mag" data-act="menu" type="button">Menu</button>' +
+        '</div>' +
+        '<div class="detail">Enter / R next round · Esc for menu</div>'
+      );
+    }
+
+    function updateHint() {
+      if (!(mode === 'cycles' || mode === 'cycles-go' || mode === 'cycles-over')) { hintEl.style.display = 'none'; return; }
+      hintEl.style.display = 'block';
+      var t;
+      if (cycles.humanCount === 2) {
+        t = '<b>P1</b> arrows · space ghost &nbsp;|&nbsp; <b>P2</b> W A S D · Q ghost &nbsp;|&nbsp; <b>1 2 3</b> speed · <b>Esc</b> menu';
+      } else if (useOverhead()) {
+        t = '<b>Arrows / WASD</b> steer (map directions) · <b>Space</b> ghost · <b>C</b> chase cam · <b>1 2 3</b> speed · <b>Esc</b> menu';
+      } else {
+        t = '<b>← → / A D</b> turn left / right · <b>Space</b> ghost · <b>C</b> overhead · <b>1 2 3</b> speed · <b>Esc</b> menu';
+      }
+      hintEl.innerHTML = t;
+    }
+
+    var hudCache = '';
+    function updateCyclesHud() {
+      if (!(mode === 'cycles' || mode === 'cycles-go' || mode === 'cycles-over')) return;
+      var D = DIFFS[difficulty];
+      var left = cycles.riders.map(function (r) {
+        var status = '';
+        if (!r.alive) status = ' <span style="opacity:.6">✕</span>';
+        else if (r.human) status = '<span class="ebar"><i style="width:' + Math.round(r.energy * 100) + '%;opacity:' + (r.trailOn ? 0.55 : 1) + '"></i></span>' + (r.trailOn ? '' : ' GHOST');
+        else if (!r.trailOn) status = ' ◌';
+        return '<div class="score-row" style="color:' + r.color + (r.alive ? '' : ';opacity:.45') + '">' + r.name + ' ' + (cycles.scores[r.id] || 0) + status + '</div>';
+      }).join('');
+      var right = '<div class="score-row" style="color:' + D.color + '">LEVEL <span class="tag">' + D.name + '</span></div>' +
+        '<div class="score-row">SPEED ' + SPEEDS[speedIdx].name + '</div>' +
+        '<div class="score-row" style="color:#ff2bd6">' + (useOverhead() ? 'OVERHEAD' : 'CHASE') + ' CAM</div>' +
+        '<div class="score-row" style="color:#9fdcff">TRAIL ' + (D.lifeMs / 1000).toFixed(0) + 's</div>';
+      var center = 'ROUND ' + cycles.round + ' · LAST RIDER WINS';
+      var big = cycles.phase === 'countdown' ? (cycles.countVal > 0 ? String(cycles.countVal) : 'GO') : '';
+      var key = left + right + center + big;
+      if (key === hudCache) return;
+      hudCache = key;
+      hudLeft.innerHTML = left;
+      hudRight.innerHTML = right;
+      hudCenter.textContent = center;
+      bigEl.textContent = big;
+    }
+
+    function updateCycles(dt) {
+      if (cycles.phase === 'countdown') {
+        cycles.countT += dt;
+        if (cycles.countT >= 0.7) {
+          cycles.countT = 0;
+          cycles.countVal -= 1;
+          if (cycles.countVal > 0) beep(330, 0.1, 'square', 0.04);
+          else if (cycles.countVal === 0) beep(660, 0.16, 'square', 0.06);
+          else { cycles.phase = 'play'; mode = 'cycles'; }
+          updateCyclesHud();
+        }
+      } else if (cycles.phase === 'play') {
+        cycles.tickAcc += dt * 1000;
+        var guard = 0;
+        while (cycles.tickAcc >= cycles.tickMs && cycles.phase === 'play' && guard++ < 5) {
+          cycles.tickAcc -= cycles.tickMs;
+          cyclesTick();
+        }
+        if (guard >= 5) cycles.tickAcc = 0;
+      }
+    }
+
+    function interpAlpha() {
+      return cycles.phase === 'play' ? Math.min(1, cycles.tickAcc / cycles.tickMs) : (cycles.phase === 'over' ? 1 : 0);
+    }
+
+    function dirYaw(dir) { var d = DIRS[dir]; return Math.atan2(-d.y, d.x); }
+
+    /* ---------- 2D fallback renderer (only used when three.js can't load) ---------- */
+    var L2 = { cell: 8, padX: 0, padY: 0 };
+    function layout2D() {
+      L2.cell = Math.max(3, Math.min((W - 48) / COLS, (H - 140) / ROWS));
+      L2.padX = (W - COLS * L2.cell) / 2;
+      L2.padY = (H - ROWS * L2.cell) / 2 + 10;
+    }
+    function cellCenter2D(x, y) { layout2D(); return { x: L2.padX + (x + 0.5) * L2.cell, y: L2.padY + (y + 0.5) * L2.cell }; }
+    function renderCycles2D() {
+      layout2D();
+      var c = L2.cell, a = interpAlpha(), i, j, r, p, age, f;
+      ctx.fillStyle = '#04010c';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(0, 8, 24, 0.8)';
+      ctx.fillRect(L2.padX, L2.padY, COLS * c, ROWS * c);
+      ctx.strokeStyle = 'rgba(0, 246, 255, 0.07)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (i = 0; i <= COLS; i += 4) { ctx.moveTo(L2.padX + i * c, L2.padY); ctx.lineTo(L2.padX + i * c, L2.padY + ROWS * c); }
+      for (i = 0; i <= ROWS; i += 4) { ctx.moveTo(L2.padX, L2.padY + i * c); ctx.lineTo(L2.padX + COLS * c, L2.padY + i * c); }
+      ctx.stroke();
+      glowStroke(COL.cyan, 2.2, 18, function () { ctx.strokeRect(L2.padX - 1, L2.padY - 1, COLS * c + 2, ROWS * c + 2); });
+      for (i = 0; i < cycles.riders.length; i++) {
+        r = cycles.riders[i];
+        ctx.fillStyle = r.color;
+        for (j = 0; j < r.pieces.length; j++) {
+          p = r.pieces[j];
+          age = (tickNo - p.b + a) / cycles.lifeTicks;
+          if (age >= 1) continue;
+          f = age < 0.6 ? 1 : 1 - (age - 0.6) / 0.4;
+          ctx.globalAlpha = 0.25 + 0.75 * f;
+          var cx = L2.padX + (p.x + 0.5) * c, cy = L2.padY + (p.y + 0.5) * c;
+          var len = (j === r.pieces.length - 1 && p.b === tickNo && r.alive) ? a : p.len;
+          var dx = DIRS[p.dir].x * len * c, dy = DIRS[p.dir].y * len * c, w = Math.max(2, c * 0.55 * (0.4 + 0.6 * f));
+          ctx.fillRect(Math.min(cx, cx + dx) - w / 2, Math.min(cy, cy + dy) - w / 2, Math.abs(dx) + w, Math.abs(dy) + w);
+        }
+        ctx.globalAlpha = 1;
+      }
+      for (i = 0; i < cycles.riders.length; i++) {
+        r = cycles.riders[i];
+        if (!r.alive) continue;
+        var x = L2.padX + (r.px + (r.x - r.px) * a + 0.5) * c, y = L2.padY + (r.py + (r.y - r.py) * a + 0.5) * c;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(r.dir * Math.PI / 2);
+        ctx.globalAlpha = r.trailOn ? 1 : 0.35 + Math.random() * 0.3;
+        ctx.shadowColor = r.color; ctx.shadowBlur = 18; ctx.fillStyle = r.color;
+        var s = c * 2.2;
+        ctx.beginPath(); ctx.moveTo(0, -s * 0.6); ctx.lineTo(s * 0.32, s * 0.4); ctx.lineTo(0, s * 0.15); ctx.lineTo(-s * 0.32, s * 0.4); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    /* ============================================================
+       MODE 2 — SHIP DODGE (redesigned: readable, forgiving, ramps up)
+       ============================================================ */
+    const DODGE_DIFF = {
+      easy:   { speed0: 7.5, speedMax: 14, ramp: 75, wave0: 1.7, waveMin: 0.85, gap0: 3.4, gapMin: 2.1, lives: 4, drift: false, fill0: 0.35 },
+      medium: { speed0: 9,   speedMax: 18, ramp: 65, wave0: 1.45, waveMin: 0.7, gap0: 3.0, gapMin: 1.75, lives: 3, drift: true, fill0: 0.45 },
+      hard:   { speed0: 10.5, speedMax: 22, ramp: 55, wave0: 1.2, waveMin: 0.55, gap0: 2.6, gapMin: 1.45, lives: 3, drift: true, fill0: 0.6 }
+    };
+    const TRACK = 3.0;          // track spans x in [-3, 3]
+    const SHIP_Z = 2.2;         // ship distance from camera
+    const ZFAR = 44;            // obstacles spawn here (≈3-5 s warning)
+    const HIT_HALF = 0.26;      // ship hitbox half width (visual ≈ 0.45)
+    const SHIP_DEPTH = 0.25;
+    const BLOCK_DEPTH = 0.7;
+    const LATERAL = 6.8;        // max steering speed (units/s)
+    const PICK_TYPES = ['shield', 'slow', 'magnet'];
+    const PICK_COL = { shield: '#00f6ff', slow: '#b967ff', magnet: '#ffd319' };
+    const PICK_ICON = { shield: 'S', slow: '⏱', magnet: 'M' };
+
+    var dodge = {
+      x: 0, vx: 0, tilt: 0, speed: 8, dist: 0, t: 0, score: 0, best: 0,
+      lives: 3, invuln: 0, shield: false, slowT: 0, magnetT: 0,
+      combo: 0, comboT: 0, mult: 1, orbs: 0, nearMisses: 0,
+      waves: [], orbsList: [], picks: [], texts: [], thrusters: [],
+      nextWaveZ: 0, lastGap: 0, pickT: 10, dead: false, shake: 0, flash: 0, flashCol: '#fff',
+      bot: false, newBest: false
+    };
+
+    function dodgeBestKey() { return 'lc3d-dodge-best-' + difficulty; }
+    function loadDodgeBest() {
+      try { return Number(localStorage.getItem(dodgeBestKey())) || 0; } catch (e) { return 0; }
+    }
+    function saveDodgeBest(v) { try { localStorage.setItem(dodgeBestKey(), String(v)); } catch (e) {} }
+
+    function dodgeProgress() { var DD = DODGE_DIFF[difficulty]; var p = Math.min(1, dodge.t / DD.ramp); return p * p * (3 - 2 * p); }
+
+    function startDodge() {
+      var DD = DODGE_DIFF[difficulty];
+      Object.assign(dodge, {
+        x: 0, vx: 0, tilt: 0, speed: DD.speed0, dist: 0, t: 0, score: 0, best: loadDodgeBest(),
+        lives: DD.lives, invuln: 1.2, shield: false, slowT: 0, magnetT: 0,
+        combo: 0, comboT: 0, mult: 1, orbs: 0, nearMisses: 0,
+        waves: [], orbsList: [], picks: [], texts: [], thrusters: [],
+        lastGap: 0, pickT: 9 + Math.random() * 4, dead: false, shake: 0, flash: 0, newBest: false
+      });
+      // first wave starts well out so the player gets a calm opening
+      dodge.nextWaveZ = 26;
+      while (dodge.nextWaveZ < ZFAR) spawnWave();
+      particles.length = 0;
+      mode = 'dodge';
+      setView3D(false);
+      btnTrail.style.visibility = 'hidden';
+      overlay.classList.add('hidden');
+      bigEl.textContent = '';
+      hintEl.style.display = 'block';
+      hintEl.innerHTML = '<b>← → / A D</b> steer · grab <b style="color:#ffd319">orbs</b> for combo · pickups: <b style="color:#00f6ff">S</b> shield <b style="color:#b967ff">⏱</b> slow-mo <b style="color:#ffd319">M</b> magnet · <b>Esc</b> menu';
+      beep(440, 0.1, 'square', 0.04);
+      updateDodgeHud(true);
+    }
+
+    function spawnWave() {
+      var DD = DODGE_DIFF[difficulty], p = dodgeProgress();
+      var waveT = DD.wave0 + (DD.waveMin - DD.wave0) * p;           // seconds between waves at current speed
+      var gap = DD.gap0 + (DD.gapMin - DD.gap0) * p;
+      var spacing = Math.max(5, dodge.speed * waveT);
+      var z = dodge.nextWaveZ;
+      // guaranteed reachable gap: limit sideways jump to what a steady player can cover
+      var maxShift = LATERAL * waveT * 0.5;
+      var lo = Math.max(-TRACK + gap / 2, dodge.lastGap - maxShift);
+      var hi = Math.min(TRACK - gap / 2, dodge.lastGap + maxShift);
+      var gc = lo + Math.random() * Math.max(0, hi - lo);
+      var g0 = gc - gap / 2, g1 = gc + gap / 2;
+      var fill = DD.fill0 + (1 - DD.fill0) * p;
+      var blocks = [];
+      var palette = [COL.magenta, COL.cyan, COL.purple, COL.red, COL.gold];
+      var color = palette[(Math.random() * palette.length) | 0];
+      function region(a, b) {
+        var L = b - a;
+        if (L < 0.35) return;
+        if (Math.random() > fill && blocks.length) return;
+        if (Math.random() < 0.25 + p * 0.6) { blocks.push({ x0: a, x1: b }); return; }   // full wall
+        var w = Math.min(L, 0.9 + Math.random() * (0.8 + p * 1.4));
+        var hug = Math.random() < 0.6;                                              // hug the gap edge
+        if (a <= -TRACK + 0.01) blocks.push(hug ? { x0: b - w, x1: b } : { x0: a + Math.random() * (L - w), x1: 0 });
+        else blocks.push(hug ? { x0: a, x1: a + w } : { x0: a + Math.random() * (L - w), x1: 0 });
+        var last = blocks[blocks.length - 1];
+        if (!last.x1) last.x1 = last.x0 + w;
+      }
+      if (Math.random() < 0.5) { region(-TRACK, g0); region(g1, TRACK); } else { region(g1, TRACK); region(-TRACK, g0); }
+      if (!blocks.length) region(-TRACK, g0) || region(g1, TRACK);
+      if (!blocks.length) blocks.push(g0 > -TRACK + 0.4 ? { x0: -TRACK, x1: g0 } : { x0: g1, x1: TRACK });
+      var drift = 0;
+      if (DD.drift && blocks.length === 1 && dodge.t > 25 && Math.random() < 0.35) drift = (Math.random() < 0.5 ? -1 : 1) * (0.5 + p);
+      dodge.waves.push({ z: z, blocks: blocks, color: color, gap: [g0, g1], drift: drift, passed: false, hit: false });
+
+      // orbs trace the safe path from the previous gap to this one
+      if (Math.random() < 0.75) {
+        var n = 3 + ((Math.random() * 3) | 0), k;
+        for (k = 1; k <= n; k++) {
+          var f = k / (n + 1);
+          dodge.orbsList.push({ x: dodge.lastGap + (gc - dodge.lastGap) * f, z: z - spacing + spacing * f, got: false, ph: Math.random() * 6 });
+        }
+      }
+      dodge.pickT -= waveT;
+      if (dodge.pickT <= 0) {
+        dodge.pickT = 11 + Math.random() * 7;
+        var type = PICK_TYPES[(Math.random() * PICK_TYPES.length) | 0];
+        if (type === 'shield' && dodge.shield) type = 'magnet';
+        dodge.picks.push({ type: type, x: gc, z: z - Math.min(2.5, spacing * 0.4), got: false });
+      }
+      dodge.lastGap = gc;
+      dodge.nextWaveZ = z + spacing;
+    }
+
+    function addText(txt, color, big) { dodge.texts.push({ txt: txt, color: color, t: 0, big: !!big, x: dodge.x }); }
+
+    function dodgeHit() {
+      if (dodge.invuln > 0) return;
+      var p = dproj(dodge.x, 0.3, SHIP_Z);
+      dodge.combo = 0; dodge.mult = 1; dodge.comboT = 0;
+      dodge.shake = 0.35;
+      if (dodge.shield) {
+        dodge.shield = false;
+        dodge.invuln = 1.0;
+        burst(p.x, p.y, COL.cyan, 30, 220);
+        addText('SHIELD SAVED YOU', COL.cyan);
+        beep(300, 0.2, 'triangle', 0.06, 120);
+        return;
+      }
+      dodge.lives -= 1;
+      dodge.invuln = 1.7;
+      dodge.flash = 0.25; dodge.flashCol = '#ff2a6d';
+      burst(p.x, p.y, COL.magenta, 36, 260);
+      burst(p.x, p.y, COL.cyan, 18, 180);
+      beep(110, 0.35, 'sawtooth', 0.07, 40);
+      if (dodge.lives <= 0) killDodge();
+      else addText(dodge.lives === 1 ? 'LAST LIFE!' : 'HIT! ' + dodge.lives + ' LIVES LEFT', '#ff2a6d');
+    }
+
+    function killDodge() {
+      if (dodge.dead) return;
+      dodge.dead = true;
+      mode = 'dodge-over';
+      dodge.score = Math.floor(dodge.score);
+      if (dodge.score > dodge.best) { dodge.best = dodge.score; dodge.newBest = true; saveDodgeBest(dodge.best); }
+      var p = dproj(dodge.x, 0.3, SHIP_Z);
+      burst(p.x, p.y, COL.cyan, 60, 320);
+      burst(p.x, p.y, COL.magenta, 30, 240);
+      beep(90, 0.5, 'sawtooth', 0.08, 40);
+      setTimeout(function () { if (mode === 'dodge-over') showDodgeOver(); }, 700);
+      updateDodgeHud(true);
+    }
+
+    function showDodgeOver() {
+      setOverlay(
+        '<div class="msg">' + (dodge.newBest ? 'NEW BEST!' : 'SHIP DOWN') + '</div>' +
+        '<div class="detail">SCORE ' + dodge.score + ' &nbsp;·&nbsp; BEST ' + dodge.best + ' (' + DIFFS[difficulty].name + ')' +
+        '<br>survived ' + dodge.t.toFixed(1) + 's · ' + dodge.orbs + ' orbs · ' + dodge.nearMisses + ' near misses</div>' +
+        '<div class="diff-label">LEVEL &nbsp;·&nbsp; E / M / H</div>' + diffButtons() +
+        '<div class="btns">' +
+          '<button class="neon" data-act="again" type="button">Fly Again</button>' +
+          '<button class="neon mag" data-act="menu" type="button">Menu</button>' +
+        '</div>' +
+        '<div class="detail">Enter / R to restart · Esc for menu</div>'
+      );
+    }
+
+    var dodgeHudKey = '';
+    function updateDodgeHud(force) {
+      var D = DIFFS[difficulty];
+      var hearts = '';
+      for (var i = 0; i < Math.max(0, dodge.lives); i++) hearts += '▲ ';
+      var left = '<div class="score-row">SCORE ' + Math.floor(dodge.score) + '</div>' +
+        '<div class="score-row" style="color:#ffd319">x' + dodge.mult + ' &nbsp;COMBO ' + dodge.combo + '</div>' +
+        '<div class="score-row" style="color:#ff2bd6">LIVES ' + hearts + (dodge.shield ? '<span style="color:#00f6ff">+ SHIELD</span>' : '') + '</div>';
+      var pw = '';
+      if (dodge.slowT > 0) pw += '<div class="score-row" style="color:#b967ff">SLOW-MO ' + dodge.slowT.toFixed(1) + '</div>';
+      if (dodge.magnetT > 0) pw += '<div class="score-row" style="color:#ffd319">MAGNET ' + dodge.magnetT.toFixed(1) + '</div>';
+      var right = '<div class="score-row" style="color:' + D.color + '">LEVEL <span class="tag">' + D.name + '</span></div>' +
+        '<div class="score-row">BEST ' + Math.max(dodge.best, Math.floor(dodge.score)) + '</div>' +
+        '<div class="score-row" style="color:#9fdcff">' + dodge.t.toFixed(0) + 's</div>' + pw;
+      var key = left + right;
+      if (!force && key === dodgeHudKey) return;
+      dodgeHudKey = key;
+      hudLeft.innerHTML = left;
+      hudRight.innerHTML = right;
+      hudCenter.textContent = dodge.dead ? '' : 'SHIP DODGE';
+    }
+
+    function dodgeBotSteer() {
+      // simple test bot: aim for the nearest upcoming gap, then grab orbs if safe
+      var target = dodge.lastGap, best = 1e9, i, w;
+      for (i = 0; i < dodge.waves.length; i++) {
+        w = dodge.waves[i];
+        if (w.z + BLOCK_DEPTH < SHIP_Z - 0.2 || w.z > ZFAR - 4) continue;
+        if (w.z < best) {
+          best = w.z;
+          // choose the widest free span in this wave
+          var spans = [], xs = [-TRACK], j;
+          var bl = w.blocks.slice().sort(function (a, b) { return a.x0 - b.x0; });
+          var cur = -TRACK;
+          for (j = 0; j < bl.length; j++) { if (bl[j].x0 > cur) spans.push([cur, bl[j].x0]); cur = Math.max(cur, bl[j].x1); }
+          if (cur < TRACK) spans.push([cur, TRACK]);
+          var bs = null, bscore = -1e9;
+          for (j = 0; j < spans.length; j++) {
+            var wd = spans[j][1] - spans[j][0];
+            var c = (spans[j][0] + spans[j][1]) / 2;
+            var sc = Math.min(wd, 2.5) - Math.abs(c - dodge.x) * 0.25;
+            if (wd > HIT_HALF * 2 + 0.2 && sc > bscore) { bscore = sc; bs = spans[j]; }
+          }
+          if (bs) target = Math.max(bs[0] + 0.45, Math.min(bs[1] - 0.45, dodge.x < bs[0] + 0.45 || dodge.x > bs[1] - 0.45 ? (bs[0] + bs[1]) / 2 : dodge.x));
+        }
+      }
+      if (dodge.botLag) {
+        // human-like: only re-read the track every ~0.25 s, with a little aim error
+        dodge.botT = (dodge.botT || 0) - 1 / 60;
+        if (dodge.botT <= 0 || dodge.botTarget == null) { dodge.botT = dodge.botLag; dodge.botTarget = target + (Math.random() - 0.5) * 0.3; }
+        target = dodge.botTarget;
+      }
+      var d = target - dodge.x;
+      return d < -0.12 ? -1 : d > 0.12 ? 1 : 0;
+    }
+
+    function updateDodge(dt) {
+      var DD = DODGE_DIFF[difficulty];
+      var steer = 0;
+      if (dodge.bot) steer = dodgeBotSteer();
+      else {
+        var left = keys.ArrowLeft || keys.KeyA || touchLeft;
+        var right = keys.ArrowRight || keys.KeyD || touchRight;
+        steer = (right ? 1 : 0) - (left ? 1 : 0);
+      }
+      dodge.vx += (steer * LATERAL - dodge.vx) * Math.min(1, dt * 11);
+      if (!dodge.dead) {
+        dodge.x += dodge.vx * dt;
+        var maxX = TRACK - 0.3;
+        if (dodge.x < -maxX) { dodge.x = -maxX; dodge.vx = 0; }
+        if (dodge.x > maxX) { dodge.x = maxX; dodge.vx = 0; }
+      }
+      dodge.tilt += ((dodge.vx / LATERAL) * 0.45 - dodge.tilt) * Math.min(1, dt * 10);
+      dodge.shake = Math.max(0, dodge.shake - dt);
+      dodge.flash = Math.max(0, dodge.flash - dt);
+      if (dodge.dead) return;
+
+      dodge.t += dt;
+      dodge.invuln = Math.max(0, dodge.invuln - dt);
+      dodge.slowT = Math.max(0, dodge.slowT - dt);
+      dodge.magnetT = Math.max(0, dodge.magnetT - dt);
+      var p = dodgeProgress();
+      var slow = dodge.slowT > 0 ? 0.55 : 1;
+      dodge.speed = (DD.speed0 + (DD.speedMax - DD.speed0) * p) * slow;
+      var dz = dodge.speed * dt;
+      dodge.dist += dz;
+      dodge.score += dz * 1.0;
+      dodge.nextWaveZ -= dz;
+      while (dodge.nextWaveZ < ZFAR) spawnWave();
+
+      if (dodge.comboT > 0) { dodge.comboT -= dt; if (dodge.comboT <= 0) { dodge.combo = 0; dodge.mult = 1; } }
+
+      var i, j, w, b, s0 = SHIP_Z - SHIP_DEPTH, s1 = SHIP_Z + SHIP_DEPTH;
+      for (i = dodge.waves.length - 1; i >= 0; i--) {
+        w = dodge.waves[i];
+        w.z -= dz;
+        if (w.drift) {
+          b = w.blocks[0];
+          b.x0 += w.drift * dt; b.x1 += w.drift * dt;
+          if (b.x0 < -TRACK) { b.x1 += -TRACK - b.x0; b.x0 = -TRACK; w.drift *= -1; }
+          if (b.x1 > TRACK) { b.x0 -= b.x1 - TRACK; b.x1 = TRACK; w.drift *= -1; }
+        }
+        if (!w.hit && w.z < s1 && w.z + BLOCK_DEPTH > s0) {
+          for (j = 0; j < w.blocks.length; j++) {
+            b = w.blocks[j];
+            if (dodge.x + HIT_HALF > b.x0 && dodge.x - HIT_HALF < b.x1) {
+              if (dodge.invuln <= 0) { w.hit = true; dodgeHit(); }
+              break;
+            }
+          }
+          if (dodge.dead) return;
+        }
+        if (!w.passed && w.z + BLOCK_DEPTH < s0) {
+          w.passed = true;
+          if (!w.hit) {
+            // near miss: passed within a hair of a block edge
+            var closest = 9;
+            for (j = 0; j < w.blocks.length; j++) {
+              b = w.blocks[j];
+              if (dodge.x < b.x0) closest = Math.min(closest, b.x0 - (dodge.x + HIT_HALF));
+              else if (dodge.x > b.x1) closest = Math.min(closest, (dodge.x - HIT_HALF) - b.x1);
+            }
+            if (closest < 0.32 && dodge.invuln <= 0) {
+              var bonus = 25 * dodge.mult;
+              dodge.score += bonus;
+              dodge.nearMisses++;
+              dodge.flash = 0.18; dodge.flashCol = '#f0ff3d';
+              addText('NEAR MISS +' + bonus, '#f0ff3d');
+              beep(1200, 0.06, 'square', 0.03, 1800);
+            } else beep(500, 0.03, 'square', 0.012);
+          }
+        }
+        if (w.z < 0.6) dodge.waves.splice(i, 1);
+      }
+
+      var o, dx, dzz, reach = dodge.magnetT > 0 ? 3.2 : 0;
+      for (i = dodge.orbsList.length - 1; i >= 0; i--) {
+        o = dodge.orbsList[i];
+        o.z -= dz;
+        if (reach && o.z < SHIP_Z + 9 && o.z > SHIP_Z - 0.5 && Math.abs(o.x - dodge.x) < reach) {
+          o.x += (dodge.x - o.x) * Math.min(1, dt * 7);
+          o.z += (SHIP_Z - o.z) * Math.min(1, dt * 4);
+        }
+        dx = o.x - dodge.x; dzz = o.z - SHIP_Z;
+        if (Math.abs(dx) < 0.6 && Math.abs(dzz) < 0.6) {
+          dodge.combo++;
+          dodge.comboT = 2.6;
+          dodge.mult = Math.min(5, 1 + Math.floor(dodge.combo / 5));
+          dodge.score += 10 * dodge.mult;
+          dodge.orbs++;
+          var pp = dproj(o.x, 0.4, o.z);
+          burst(pp.x, pp.y, COL.gold, 8, 110);
+          beep(700 + Math.min(12, dodge.combo % 13) * 45, 0.05, 'triangle', 0.035);
+          if (dodge.combo % 5 === 0 && dodge.mult <= 5) addText('COMBO x' + dodge.mult, COL.gold, true);
+          dodge.orbsList.splice(i, 1);
+          continue;
+        }
+        if (o.z < 0.6) dodge.orbsList.splice(i, 1);
+      }
+      for (i = dodge.picks.length - 1; i >= 0; i--) {
+        o = dodge.picks[i];
+        o.z -= dz;
+        if (Math.abs(o.x - dodge.x) < 0.75 && Math.abs(o.z - SHIP_Z) < 0.7) {
+          if (o.type === 'shield') { dodge.shield = true; addText('SHIELD UP', PICK_COL.shield, true); }
+          if (o.type === 'slow') { dodge.slowT = 5; addText('SLOW-MO', PICK_COL.slow, true); }
+          if (o.type === 'magnet') { dodge.magnetT = 8; addText('ORB MAGNET', PICK_COL.magnet, true); }
+          var q = dproj(o.x, 0.5, o.z);
+          burst(q.x, q.y, PICK_COL[o.type], 24, 200);
+          beep(520, 0.08, 'square', 0.04, 1040);
+          dodge.picks.splice(i, 1);
+          continue;
+        }
+        if (o.z < 0.6) dodge.picks.splice(i, 1);
+      }
+      for (i = dodge.texts.length - 1; i >= 0; i--) { dodge.texts[i].t += dt; if (dodge.texts[i].t > 1.1) dodge.texts.splice(i, 1); }
+
+      if (Math.random() < 0.8) {
+        var tip = dproj(dodge.x + (Math.random() - 0.5) * 0.3, 0.2, SHIP_Z + 0.25);
+        dodge.thrusters.push({ x: tip.x, y: tip.y, vx: (Math.random() - 0.5) * 30, vy: 90 + Math.random() * 60, life: 0.25, max: 0.25,
+          color: Math.random() < 0.5 ? COL.cyan : '#ffffff', size: 2 + Math.random() * 2 });
+      }
+      for (i = dodge.thrusters.length - 1; i >= 0; i--) {
+        o = dodge.thrusters[i];
+        o.life -= dt; o.x += o.vx * dt; o.y += o.vy * dt;
+        if (o.life <= 0) dodge.thrusters.splice(i, 1);
+      }
+      updateDodgeHud();
+    }
+
+    // headless helper for playtesting: steps the sim without rendering
+    function dodgeSim(seconds, step) {
+      step = step || 1 / 60;
+      var t = 0;
+      while (t < seconds && !dodge.dead) { updateDodge(step); updateParticles(step); t += step; }
+      return { t: dodge.t, dead: dodge.dead, lives: dodge.lives, score: Math.floor(dodge.score), orbs: dodge.orbs, near: dodge.nearMisses };
+    }
+
+    /* ---------- dodge rendering ---------- */
+    var DV = { horizon: 0, vpX: 0, F: 1, camH: 1 };
+    function dodgeView() {
+      DV.horizon = H * 0.34;
+      DV.vpX = W * 0.5;
+      var span = Math.min(W * 0.84, H * 1.25);
+      DV.F = span * SHIP_Z / (TRACK * 2);
+      DV.camH = (H * 0.86 - DV.horizon) * SHIP_Z / DV.F;
+    }
+    function dproj(x, y, z) {
+      z = Math.max(0.3, z);
+      return { x: DV.vpX + x * DV.F / z, y: DV.horizon + (DV.camH - y) * DV.F / z, s: DV.F / z };
+    }
+
+    function quad(a, b, c, d) { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); }
+
+    function drawDodgeFloor() {
+      var sky = ctx.createLinearGradient(0, 0, 0, DV.horizon);
+      sky.addColorStop(0, '#07001a');
+      sky.addColorStop(1, '#3a0a4a');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, DV.horizon);
+      drawSun(DV.vpX, DV.horizon - 6, Math.min(W, H) * 0.15);
+      ctx.fillStyle = '#05010d';
+      ctx.fillRect(0, DV.horizon, W, H - DV.horizon);
+      // track surface
+      var a = dproj(-TRACK, 0, ZFAR), b = dproj(TRACK, 0, ZFAR), c = dproj(TRACK, 0, 0.9), d = dproj(-TRACK, 0, 0.9);
+      var tg = ctx.createLinearGradient(0, DV.horizon, 0, H);
+      tg.addColorStop(0, 'rgba(40, 0, 70, 0.6)');
+      tg.addColorStop(1, 'rgba(0, 30, 60, 0.75)');
+      ctx.fillStyle = tg;
+      quad(a, b, c, d);
+      ctx.fill();
+      // scrolling cross lines
+      ctx.save();
+      ctx.lineWidth = 1.2;
+      var off = dodge.dist % 2.5, z, k;
+      for (k = 0; k < 18; k++) {
+        z = 1 + k * 2.5 - off;
+        if (z < 0.9) continue;
+        var l = dproj(-TRACK, 0, z), r = dproj(TRACK, 0, z);
+        ctx.strokeStyle = 'rgba(0, 246, 255,' + (0.5 * (1 - z / ZFAR)).toFixed(3) + ')';
+        ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(r.x, r.y); ctx.stroke();
+      }
+      for (k = -2; k <= 2; k++) {
+        var xx = k * 1.5, p0 = dproj(xx, 0, ZFAR), p1 = dproj(xx, 0, 0.9);
+        ctx.strokeStyle = 'rgba(0, 246, 255, 0.18)';
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+      }
+      ctx.restore();
+      // glowing rails
+      glowStroke(COL.magenta, 3, 18, function () {
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(d.x, d.y); ctx.moveTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+      });
+      glowStroke(COL.magenta, 2, 16, function () { ctx.beginPath(); ctx.moveTo(0, DV.horizon); ctx.lineTo(W, DV.horizon); ctx.stroke(); });
+    }
+
+    function fadeIn(z) { return Math.max(0, Math.min(1, (ZFAR - z) / 7)); }
+
+    function drawBlock(b, z0, color, alpha) {
+      var z1 = z0 + BLOCK_DEPTH, h = 0.95;
+      if (z0 < 0.7) return;
+      var f0 = [dproj(b.x0, 0, z0), dproj(b.x1, 0, z0), dproj(b.x1, h, z0), dproj(b.x0, h, z0)];
+      var f1 = [dproj(b.x0, 0, z1), dproj(b.x1, 0, z1), dproj(b.x1, h, z1), dproj(b.x0, h, z1)];
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      // side faces (only the one facing the camera)
+      ctx.fillStyle = color;
+      if (b.x0 > 0) { ctx.globalAlpha = alpha * 0.22; quad(f0[0], f1[0], f1[3], f0[3]); ctx.fill(); ctx.globalAlpha = alpha; ctx.stroke(); }
+      if (b.x1 < 0) { ctx.globalAlpha = alpha * 0.22; quad(f0[1], f1[1], f1[2], f0[2]); ctx.fill(); ctx.globalAlpha = alpha; ctx.stroke(); }
+      // top
+      ctx.globalAlpha = alpha * 0.4; quad(f0[3], f0[2], f1[2], f1[3]); ctx.fill(); ctx.globalAlpha = alpha; ctx.stroke();
+      // front face
+      ctx.shadowColor = color; ctx.shadowBlur = 16;
+      ctx.globalAlpha = alpha * 0.3; quad(f0[0], f0[1], f0[2], f0[3]); ctx.fill();
+      ctx.globalAlpha = alpha; ctx.lineWidth = 2.5; ctx.stroke();
+      // hot top edge
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.globalAlpha = alpha * 0.8;
+      ctx.beginPath(); ctx.moveTo(f0[3].x, f0[3].y); ctx.lineTo(f0[2].x, f0[2].y); ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawOrb(o) {
+      if (o.z < 0.8 || o.z > ZFAR) return;
+      var bob = Math.sin(dodge.t * 5 + o.ph) * 0.08;
+      var p = dproj(o.x, 0.42 + bob, o.z);
+      var r = Math.max(1.5, 0.2 * p.s);
+      ctx.save();
+      ctx.globalAlpha = fadeIn(o.z);
+      ctx.shadowColor = COL.gold; ctx.shadowBlur = 18;
+      ctx.fillStyle = COL.gold;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0; ctx.fillStyle = '#fff8d0';
+      ctx.beginPath(); ctx.arc(p.x - r * 0.25, p.y - r * 0.25, r * 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    function drawPick(o) {
+      if (o.z < 0.8 || o.z > ZFAR) return;
+      var p = dproj(o.x, 0.55 + Math.sin(dodge.t * 4) * 0.1, o.z);
+      var r = Math.max(3, 0.36 * p.s), col = PICK_COL[o.type];
+      ctx.save();
+      ctx.globalAlpha = fadeIn(o.z);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(dodge.t * 2);
+      ctx.shadowColor = col; ctx.shadowBlur = 22;
+      ctx.strokeStyle = col; ctx.lineWidth = 3;
+      ctx.fillStyle = 'rgba(5,1,16,0.7)';
+      ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.rotate(-dodge.t * 2);
+      ctx.shadowBlur = 8; ctx.fillStyle = '#fff';
+      ctx.font = '700 ' + Math.round(r * 0.9) + 'px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(PICK_ICON[o.type], 0, 1);
+      ctx.restore();
+    }
+
+    function drawShip() {
+      var p = dproj(dodge.x, 0.3, SHIP_Z);
+      var s = Math.max(26, 0.55 * p.s);
+      var x = p.x, y = p.y, i, t;
+      for (i = 0; i < dodge.thrusters.length; i++) {
+        t = dodge.thrusters[i];
+        ctx.save(); ctx.globalAlpha = t.life / t.max; ctx.fillStyle = t.color;
+        ctx.fillRect(t.x - t.size / 2, t.y, t.size, t.size * 1.6); ctx.restore();
+      }
+      // floor shadow glow
+      var sh = dproj(dodge.x, 0, SHIP_Z);
+      var g = ctx.createRadialGradient(sh.x, sh.y, 0, sh.x, sh.y, s);
+      g.addColorStop(0, 'rgba(0,246,255,0.35)'); g.addColorStop(1, 'rgba(0,246,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(sh.x - s, sh.y - s * 0.4, s * 2, s * 0.8);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(dodge.tilt);
+      if (dodge.invuln > 0 && Math.floor(dodge.invuln * 14) % 2 === 0) ctx.globalAlpha = 0.3;
+      var flame = ctx.createLinearGradient(0, s * 0.15, 0, s * 0.95);
+      flame.addColorStop(0, 'rgba(255,255,255,0.95)');
+      flame.addColorStop(0.35, 'rgba(0,246,255,0.85)');
+      flame.addColorStop(1, 'rgba(255,43,214,0)');
+      ctx.fillStyle = flame; ctx.shadowColor = COL.cyan; ctx.shadowBlur = 24;
+      ctx.beginPath(); ctx.moveTo(-s * 0.18, s * 0.15); ctx.lineTo(0, s * 0.95 + Math.sin(dodge.t * 40) * 4); ctx.lineTo(s * 0.18, s * 0.15); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(0, 20, 40, 0.85)';
+      ctx.beginPath(); ctx.moveTo(-s * 0.62, s * 0.38); ctx.quadraticCurveTo(-s * 0.58, -s * 0.55, 0, -s * 0.7); ctx.quadraticCurveTo(s * 0.58, -s * 0.55, s * 0.62, s * 0.38); ctx.closePath(); ctx.fill();
+      glowStroke(COL.cyan, 3, 22, function () {
+        ctx.beginPath(); ctx.moveTo(-s * 0.62, s * 0.38); ctx.quadraticCurveTo(-s * 0.58, -s * 0.55, 0, -s * 0.7); ctx.quadraticCurveTo(s * 0.58, -s * 0.55, s * 0.62, s * 0.38); ctx.stroke();
+      });
+      ctx.shadowColor = COL.magenta; ctx.shadowBlur = 12; ctx.strokeStyle = COL.magenta; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-s * 0.22, -s * 0.1); ctx.quadraticCurveTo(0, -s * 0.28, s * 0.22, -s * 0.1); ctx.stroke();
+      ctx.restore();
+      if (dodge.shield) {
+        ctx.save();
+        ctx.globalAlpha = 0.55 + Math.sin(dodge.t * 8) * 0.2;
+        ctx.strokeStyle = COL.cyan; ctx.shadowColor = COL.cyan; ctx.shadowBlur = 20; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.ellipse(x, y - s * 0.05, s * 0.95, s * 0.8, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      if (dodge.magnetT > 0) {
+        ctx.save(); ctx.globalAlpha = 0.25; ctx.strokeStyle = COL.gold; ctx.setLineDash([6, 8]); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(x, y, s * 2.2, s * 0.9, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      }
+      if (dodge.flash > 0) {
+        ctx.save(); ctx.globalAlpha = Math.min(1, dodge.flash * 4);
+        ctx.strokeStyle = dodge.flashCol; ctx.shadowColor = dodge.flashCol; ctx.shadowBlur = 20; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x, y, s * (1.6 - dodge.flash * 2), 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      }
+    }
+
+    function drawDodgeTexts() {
+      var p = dproj(dodge.x, 0.3, SHIP_Z), i, t;
+      for (i = 0; i < dodge.texts.length; i++) {
+        t = dodge.texts[i];
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - t.t / 1.1);
+        ctx.fillStyle = t.color; ctx.shadowColor = t.color; ctx.shadowBlur = 14;
+        ctx.font = '800 ' + (t.big ? 26 : 18) + 'px "Segoe UI", Impact, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(t.txt, W / 2, p.y - 90 - t.t * 50 - i * 4);
+        ctx.restore();
+      }
+    }
+
+    function renderDodge(dt) {
+      dodgeView();
+      ctx.save();
+      if (dodge.shake > 0) ctx.translate((Math.random() - 0.5) * 16 * dodge.shake, (Math.random() - 0.5) * 16 * dodge.shake);
+      drawDodgeFloor();
+      var items = [], i, w, j;
+      for (i = 0; i < dodge.waves.length; i++) items.push({ z: dodge.waves[i].z, w: dodge.waves[i] });
+      for (i = 0; i < dodge.orbsList.length; i++) items.push({ z: dodge.orbsList[i].z, o: dodge.orbsList[i] });
+      for (i = 0; i < dodge.picks.length; i++) items.push({ z: dodge.picks[i].z, p: dodge.picks[i] });
+      items.sort(function (a, b) { return b.z - a.z; });
+      var shipDrawn = false;
+      for (i = 0; i < items.length; i++) {
+        if (!shipDrawn && items[i].z < SHIP_Z - 0.3) { if (!dodge.dead) drawShip(); shipDrawn = true; }
+        if (items[i].w) {
+          w = items[i].w;
+          var a = fadeIn(w.z) * (w.hit ? 0.35 : 1);
+          // sort blocks so the ones closest to the centre draw last
+          var bl = w.blocks.slice().sort(function (p, q) { return Math.abs(q.x0 + q.x1) - Math.abs(p.x0 + p.x1); });
+          for (j = 0; j < bl.length; j++) drawBlock(bl[j], w.z, w.color, a);
+        } else if (items[i].o) drawOrb(items[i].o);
+        else drawPick(items[i].p);
+      }
+      if (!shipDrawn && !dodge.dead) drawShip();
+      ctx.restore();
+      if (dodge.slowT > 0) { ctx.fillStyle = 'rgba(120, 60, 255, 0.08)'; ctx.fillRect(0, 0, W, H); }
+      if (dodge.flash > 0 && dodge.flashCol === '#ff2a6d') { ctx.fillStyle = 'rgba(255, 42, 109,' + (dodge.flash * 0.6).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
+      drawDodgeTexts();
+    }
+
+    /* ============================================================
+       3D RENDERER (three.js)
+       ============================================================ */
+    var R3 = null;
+    const TRAIL_H = 1.25, TRAIL_T = 0.07, BIKE_SCALE = 1.25;
+
+    function gx(x) { return x - COLS / 2 + 0.5; }
+    function gz(y) { return y - ROWS / 2 + 0.5; }
+
+    function glowTexture() {
+      var c = document.createElement('canvas'); c.width = c.height = 128;
+      var g = c.getContext('2d'), grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+      grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.35, 'rgba(255,255,255,0.35)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+      var t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+    }
+
+    function gridTexture(renderer) {
+      var c = document.createElement('canvas'); c.width = c.height = 256;
+      var g = c.getContext('2d');
+      g.fillStyle = 'rgba(2, 4, 12, 0.74)'; g.fillRect(0, 0, 256, 256);
+      g.fillStyle = 'rgba(0, 150, 220, 0.16)';
+      for (var i = 1; i < 4; i++) { g.fillRect(i * 64 - 1, 0, 2, 256); g.fillRect(0, i * 64 - 1, 256, 2); }
+      g.fillStyle = 'rgba(0, 210, 255, 0.42)';
+      g.fillRect(0, 0, 2, 256); g.fillRect(254, 0, 2, 256); g.fillRect(0, 0, 256, 2); g.fillRect(0, 254, 256, 2);
+      var t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(COLS / 4, ROWS / 4);
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    }
+
+    function init3D() {
+      var renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      var scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x020308);
+      scene.fog = new THREE.FogExp2(0x030512, 0.0075);
+      var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 800);
+      camera.position.set(0, 60, 60);
+      scene.add(new THREE.HemisphereLight(0x6a8cff, 0x080010, 0.9));
+      var dl = new THREE.DirectionalLight(0xbfd8ff, 1.2); dl.position.set(30, 60, 20); scene.add(dl);
+
+      // reflective floor + translucent neon grid on top
+      var mirror = new Reflector(new THREE.PlaneGeometry(COLS, ROWS), {
+        textureWidth: Math.floor(window.innerWidth * 0.6), textureHeight: Math.floor(window.innerHeight * 0.6),
+        color: 0x40465c, clipBias: 0.003
+      });
+      mirror.rotation.x = -Math.PI / 2;
+      scene.add(mirror);
+      var gridMat = new THREE.MeshBasicMaterial({ map: gridTexture(renderer), transparent: true, depthWrite: false });
+      var grid = new THREE.Mesh(new THREE.PlaneGeometry(COLS, ROWS), gridMat);
+      grid.rotation.x = -Math.PI / 2; grid.position.y = 0.01; grid.renderOrder = 1;
+      scene.add(grid);
+      // outer world: dark floor with a faint wide grid
+      var outer = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), new THREE.MeshBasicMaterial({ color: 0x03030a }));
+      outer.rotation.x = -Math.PI / 2; outer.position.y = -0.06; scene.add(outer);
+      var og = new THREE.GridHelper(1600, 160, 0x3a1466, 0x1a0b33); og.position.y = -0.04; scene.add(og);
+
+      // glowing arena walls
+      var wallMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(COL.cyan).multiplyScalar(0.5), transparent: true, opacity: 0.22,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+      var railMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(COL.cyan).multiplyScalar(2.2) });
+      var postMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(COL.magenta).multiplyScalar(1.6) });
+      var WH = 2.6;
+      function wall(cx, cz, len, rotY) {
+        var g = new THREE.Group();
+        var panel = new THREE.Mesh(new THREE.PlaneGeometry(len, WH), wallMat); panel.position.y = WH / 2; g.add(panel);
+        var top = new THREE.Mesh(new THREE.BoxGeometry(len + 0.3, 0.14, 0.14), railMat); top.position.y = WH; g.add(top);
+        var bot = new THREE.Mesh(new THREE.BoxGeometry(len + 0.3, 0.1, 0.22), railMat); bot.position.y = 0.05; g.add(bot);
+        for (var k = 0; k <= len; k += 10) {
+          var post = new THREE.Mesh(new THREE.BoxGeometry(0.16, WH, 0.16), postMat); post.position.set(k - len / 2, WH / 2, 0); g.add(post);
+        }
+        g.position.set(cx, 0, cz); g.rotation.y = rotY; scene.add(g);
+      }
+      wall(0, -ROWS / 2, COLS, 0); wall(0, ROWS / 2, COLS, 0);
+      wall(-COLS / 2, 0, ROWS, Math.PI / 2); wall(COLS / 2, 0, ROWS, Math.PI / 2);
+
+      // stars + distant horizon ring
+      var sg = new THREE.BufferGeometry(), sp = [];
+      for (var s = 0; s < 900; s++) {
+        var th = Math.random() * Math.PI * 2, ph = Math.random() * 0.45 + 0.04, rr = 520;
+        sp.push(Math.cos(th) * Math.cos(ph) * rr, Math.sin(ph) * rr, Math.sin(th) * Math.cos(ph) * rr);
+      }
+      sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+      scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0x9fbfff, size: 1.4, sizeAttenuation: false, fog: false })));
+      var ring = new THREE.Mesh(new THREE.TorusGeometry(300, 0.6, 6, 160), new THREE.MeshBasicMaterial({ color: new THREE.Color(COL.magenta).multiplyScalar(0.9), fog: false }));
+      ring.rotation.x = Math.PI / 2; ring.position.y = 0; scene.add(ring);
+
+      var composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      var bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.75, 0.4, 0.62);
+      if (!/nobloom/.test(location.search)) composer.addPass(bloom);
+      composer.addPass(new OutputPass());
+
+      R3 = {
+        renderer: renderer, scene: scene, camera: camera, composer: composer, bloom: bloom, mirror: mirror,
+        glowTex: glowTexture(), riders: [], fx: [],
+        camPos: new THREE.Vector3(0, 60, 60), camLook: new THREE.Vector3(), shake: 0, time: 0,
+        unitBox: new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0),
+        edgeBox: new THREE.BoxGeometry(1, 1, 1),
+        shardGeo: new THREE.TetrahedronGeometry(0.16),
+        m4: new THREE.Matrix4(), q: new THREE.Quaternion(), v: new THREE.Vector3(), sc: new THREE.Vector3(), col: new THREE.Color(),
+        up: new THREE.Vector3(0, 1, 0)
+      };
+      window.addEventListener('resize', function () {
+        renderer.setSize(window.innerWidth, window.innerHeight, false);
+        composer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      });
+    }
+
+    function setView3D(on) {
+      document.body.classList.toggle('three', !!on);
+      glCanvas.style.display = on ? 'block' : 'none';
+      canvas.style.display = on ? 'none' : 'block';
+    }
+
+    /* ---- sleek light-cycle built from primitives ---- */
+    function makeBike(colorHex) {
+      var color = new THREE.Color(colorHex);
+      var mats = [];
+      function M(m) { m.transparent = true; mats.push(m); return m; }
+      var outer = new THREE.Group();
+      var inner = new THREE.Group();   // lean happens here
+      outer.add(inner);
+      var body = new THREE.Group();
+      body.position.x = 0.35;         // trail leaves from just behind the rear wheel
+      inner.add(body);
+
+      var shell = new THREE.Shape();
+      shell.moveTo(-1.0, 0.16);
+      shell.lineTo(-1.02, 0.46);
+      shell.quadraticCurveTo(-0.85, 0.68, -0.45, 0.66);
+      shell.lineTo(0.05, 0.56);
+      shell.quadraticCurveTo(0.6, 0.55, 1.02, 0.28);
+      shell.lineTo(0.98, 0.14);
+      shell.lineTo(0.62, 0.1);
+      shell.lineTo(-0.62, 0.1);
+      shell.closePath();
+      var shellGeo = new THREE.ExtrudeGeometry(shell, { depth: 0.2, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.03, bevelSegments: 2, curveSegments: 10 });
+      shellGeo.translate(0, 0, -0.1);
+      var shellMat = M(new THREE.MeshStandardMaterial({ color: 0x0a0e18, metalness: 0.85, roughness: 0.28, emissive: color, emissiveIntensity: 0.06 }));
+      body.add(new THREE.Mesh(shellGeo, shellMat));
+      var edges = new THREE.LineSegments(new THREE.EdgesGeometry(shellGeo, 25), M(new THREE.LineBasicMaterial({ color: color.clone().multiplyScalar(0.95) })));
+      body.add(edges);
+      // side light strips
+      var stripMat = M(new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(1.5) }));
+      [-1, 1].forEach(function (side) {
+        var strip = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.035, 0.02), stripMat);
+        strip.position.set(0.02, 0.36, side * 0.145); body.add(strip);
+        var strip2 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.025, 0.02), stripMat);
+        strip2.position.set(-0.45, 0.5, side * 0.14); strip2.rotation.z = 0.12; body.add(strip2);
+      });
+      // canopy
+      var canopy = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 14), M(new THREE.MeshStandardMaterial({
+        color: 0x0c1830, metalness: 0.3, roughness: 0.05, emissive: color, emissiveIntensity: 0.12, opacity: 0.9 })));
+      canopy.scale.set(0.5, 0.14, 0.13); canopy.position.set(-0.1, 0.62, 0); body.add(canopy);
+      // wheels: twin glowing rings with dark hubs
+      var ringMat = M(new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(1.15) }));
+      var hubMat = M(new THREE.MeshStandardMaterial({ color: 0x05070c, metalness: 0.9, roughness: 0.35 }));
+      var capMat = M(new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(0.8) }));
+      var ringGeo = new THREE.TorusGeometry(0.3, 0.05, 10, 40);
+      var hubGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.3, 28); hubGeo.rotateX(Math.PI / 2);
+      var capGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.34, 16); capGeo.rotateX(Math.PI / 2);
+      var wheels = [];
+      [-0.62, 0.62].forEach(function (wx) {
+        var wg = new THREE.Group(); wg.position.set(wx, 0.3, 0);
+        [-0.14, 0.14].forEach(function (wz) { var r = new THREE.Mesh(ringGeo, ringMat); r.position.z = wz; wg.add(r); });
+        wg.add(new THREE.Mesh(hubGeo, hubMat));
+        wg.add(new THREE.Mesh(capGeo, capMat));
+        for (var k = 0; k < 3; k++) { var spoke = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.03, 0.31), capMat); spoke.rotation.z = k * Math.PI / 3; wg.add(spoke); }
+        body.add(wg); wheels.push(wg);
+      });
+      // head & tail lights
+      var head = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), M(new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 3, 3) })));
+      head.position.set(1.0, 0.24, 0); body.add(head);
+      var tail = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.22), stripMat);
+      tail.position.set(-1.03, 0.36, 0); body.add(tail);
+      // under-glow on the floor
+      var glow = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.0), M(new THREE.MeshBasicMaterial({ map: R3.glowTex, color: color.clone().multiplyScalar(0.3),
+        blending: THREE.AdditiveBlending, depthWrite: false })));
+      glow.rotation.x = -Math.PI / 2; glow.position.set(0.35, 0.03, 0); outer.add(glow);
+      outer.scale.setScalar(BIKE_SCALE);
+      return { group: outer, inner: inner, wheels: wheels, mats: mats, baseOpacity: mats.map(function (m) { return m.opacity; }) };
+    }
+
+    function makeTrail(colorHex) {
+      var color = new THREE.Color(colorHex);
+      var cap = cycles.lifeTicks + 8;
+      var wallMat = new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(0.42), transparent: true, opacity: 0.55,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+      var wall = new THREE.InstancedMesh(R3.unitBox, wallMat, cap);
+      var edgeMat = new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(1.6), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+      var edge = new THREE.InstancedMesh(R3.edgeBox, edgeMat, cap);
+      var c = new THREE.Color(1, 1, 1);
+      for (var i = 0; i < cap; i++) { wall.setColorAt(i, c); edge.setColorAt(i, c); }
+      wall.count = 0; edge.count = 0;
+      wall.frustumCulled = false; edge.frustumCulled = false;
+      wall.renderOrder = 2; edge.renderOrder = 3;
+      R3.scene.add(wall); R3.scene.add(edge);
+      return { wall: wall, edge: edge, cap: cap };
+    }
+
+    function clearCycles3D() {
+      if (!R3) return;
+      R3.riders.forEach(function (v) {
+        R3.scene.remove(v.bike.group); R3.scene.remove(v.trail.wall); R3.scene.remove(v.trail.edge);
+        v.trail.wall.dispose(); v.trail.edge.dispose();
+      });
+      R3.riders = [];
+      R3.fx.forEach(function (f) { R3.scene.remove(f.obj); });
+      R3.fx = [];
+    }
+
+    function buildRiders3D() {
+      if (!R3) init3D();
+      clearCycles3D();
+      cycles.riders.forEach(function (r) {
+        var v = { bike: makeBike(r.color), trail: makeTrail(r.color) };
+        r.view = v;
+        r.yaw = dirYaw(r.dir);
+        v.bike.group.position.set(gx(r.x), 0, gz(r.y));
+        R3.scene.add(v.bike.group);
+        R3.riders.push(v);
+      });
+      var p1 = cycles.riders[0];
+      if (p1) snapCamera(p1);
+    }
+
+    function explode3D(r) {
+      if (!R3 || !r.view) return;
+      var a = interpAlpha();
+      var px = gx(r.px + (r.x - r.px) * a), pz = gz(r.py + (r.y - r.py) * a);
+      var color = new THREE.Color(r.color).multiplyScalar(2.2);
+      var mat = new THREE.MeshBasicMaterial({ color: color, transparent: true });
+      var group = new THREE.Group();
+      var shards = [];
+      for (var i = 0; i < 46; i++) {
+        var m = new THREE.Mesh(R3.shardGeo, mat);
+        m.position.set(px, 0.5, pz);
+        m.scale.setScalar(0.5 + Math.random() * 1.4);
+        var ang = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 7;
+        shards.push({ m: m, vx: Math.cos(ang) * sp, vy: 3 + Math.random() * 8, vz: Math.sin(ang) * sp, rx: Math.random() * 10, ry: Math.random() * 10 });
+        group.add(m);
+      }
+      var flash = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 12), new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(1.5), transparent: true,
+        blending: THREE.AdditiveBlending, depthWrite: false }));
+      flash.position.set(px, 0.6, pz);
+      group.add(flash);
+      R3.scene.add(group);
+      R3.fx.push({ obj: group, shards: shards, flash: flash, mat: mat, t: 0 });
+      r.view.bike.group.visible = false;
+      var p1 = cycles.riders[0];
+      var d = Math.hypot(gx(p1.x) - px, gz(p1.y) - pz);
+      R3.shake = Math.max(R3.shake, r === p1 ? 0.9 : Math.max(0.15, 0.6 - d / 60));
+    }
+
+    function updateFx(dt) {
+      for (var i = R3.fx.length - 1; i >= 0; i--) {
+        var f = R3.fx[i];
+        f.t += dt;
+        f.shards.forEach(function (s) {
+          s.vy -= 16 * dt;
+          s.m.position.x += s.vx * dt; s.m.position.y += s.vy * dt; s.m.position.z += s.vz * dt;
+          if (s.m.position.y < 0.05) { s.m.position.y = 0.05; s.vy *= -0.35; s.vx *= 0.7; s.vz *= 0.7; }
+          s.m.rotation.x += s.rx * dt; s.m.rotation.y += s.ry * dt;
+        });
+        f.flash.scale.setScalar(1 + f.t * 9);
+        f.flash.material.opacity = Math.max(0, 1 - f.t * 3);
+        f.mat.opacity = Math.max(0, 1 - Math.max(0, f.t - 0.9) / 0.8);
+        if (f.t > 1.8) { R3.scene.remove(f.obj); R3.fx.splice(i, 1); }
+      }
+    }
+
+    function angleDelta(a, b) { var d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; }
+
+    function riderPos(r, a) { return { x: gx(r.px + (r.x - r.px) * a), z: gz(r.py + (r.y - r.py) * a) }; }
+
+    function chaseTarget(r, out, look) {
+      var a = interpAlpha(), p = riderPos(r, a);
+      var fx = Math.cos(r.yaw), fz = -Math.sin(r.yaw);
+      out.set(p.x - fx * 5.6 + fz * 1.6, 3.9, p.z - fz * 5.6 - fx * 1.6);
+      look.set(p.x + fx * 6, 0.4, p.z + fz * 6);
+    }
+    function overheadTarget(out, look) {
+      var cam = R3.camera, tanH = Math.tan(cam.fov * Math.PI / 360);
+      var h = Math.max((ROWS / 2 + 8) / tanH, (COLS / 2 + 8) / (tanH * cam.aspect)) * 0.98;
+      out.set(0, h, h * 0.32);
+      look.set(0, 0, 3);
+    }
+    function snapCamera(r) {
+      if (useOverhead()) overheadTarget(R3.camPos, R3.camLook); else chaseTarget(r, R3.camPos, R3.camLook);
+    }
+
+    var tmpPos = null, tmpLook = null;
+    function render3D(dt) {
+      if (!R3) return;
+      R3.time += dt;
+      var a = interpAlpha(), i, j;
+      for (i = 0; i < cycles.riders.length; i++) {
+        var r = cycles.riders[i], v = r.view;
+        if (!v) continue;
+        var bike = v.bike;
+        if (r.alive) {
+          var p = riderPos(r, a);
+          var target = dirYaw(r.dir);
+          var d = angleDelta(r.yaw, target);
+          var step = d * Math.min(1, dt * 16);
+          r.yaw += step;
+          var yv = dt > 0 ? step / dt : 0;
+          r.yawVel += (yv - r.yawVel) * Math.min(1, dt * 10);
+          r.lean += (Math.max(-0.55, Math.min(0.55, -r.yawVel * 0.075)) - r.lean) * Math.min(1, dt * 9);
+          bike.group.position.set(p.x, 0, p.z);
+          bike.group.rotation.y = r.yaw;
+          bike.inner.rotation.x = r.lean;
+          bike.inner.position.y = Math.sin(R3.time * 9 + i) * 0.01;
+          var spin = (cycles.phase === 'play' ? 1 : 0.15) * dt * (1000 / cycles.tickMs) / 0.3;
+          for (j = 0; j < bike.wheels.length; j++) bike.wheels[j].rotation.z -= spin;
+          var ghost = !r.trailOn;
+          for (j = 0; j < bike.mats.length; j++) {
+            bike.mats[j].opacity = ghost ? bike.baseOpacity[j] * (0.18 + (Math.random() < 0.25 ? 0.05 : 0.32) + 0.1 * Math.sin(R3.time * 40)) : bike.baseOpacity[j];
+            bike.mats[j].depthWrite = !ghost;
+          }
+        }
+        // trail ribbons with fade-out
+        var tr = v.trail, n = 0, pcs = r.pieces;
+        var nearFade = (i === 0 && !useOverhead() && r.alive) ? riderPos(r, a) : null;
+        for (j = 0; j < pcs.length && n < tr.cap; j++) {
+          var pc = pcs[j];
+          var age = (tickNo - pc.b + a) / cycles.lifeTicks;
+          if (age >= 1) continue;
+          var len = (r.alive && pc.b === tickNo && j === pcs.length - 1) ? a : pc.len;
+          var fade = age < 0.55 ? 1 : 1 - (age - 0.55) / 0.45;
+          var hgt = TRAIL_H * (0.15 + 0.85 * Math.sqrt(fade));
+          var dx = DIRS[pc.dir].x, dz = DIRS[pc.dir].y;
+          var cx = gx(pc.x) + dx * len / 2, cz = gz(pc.y) + dz * len / 2;
+          R3.q.setFromAxisAngle(R3.up, dirYaw(pc.dir));
+          R3.v.set(cx, 0, cz);
+          R3.sc.set(len + TRAIL_T, hgt, TRAIL_T);
+          R3.m4.compose(R3.v, R3.q, R3.sc);
+          tr.wall.setMatrixAt(n, R3.m4);
+          R3.v.set(cx, hgt, cz);
+          R3.sc.set(len + 0.1, 0.06, 0.1);
+          R3.m4.compose(R3.v, R3.q, R3.sc);
+          tr.edge.setMatrixAt(n, R3.m4);
+          var bright = fade * (age < 0.04 ? 1.3 : 1);
+          if (nearFade) {
+            // in chase view, thin out the player's own wall right under the camera
+            var ddx = cx - nearFade.x, ddz = cz - nearFade.z, dd = Math.sqrt(ddx * ddx + ddz * ddz);
+            if (dd > 0.8) bright *= Math.max(0.06, 1 - (dd - 0.8) / 2.2);
+          }
+          R3.col.setRGB(bright, bright, bright);
+          tr.wall.setColorAt(n, R3.col);
+          tr.edge.setColorAt(n, R3.col);
+          n++;
+        }
+        tr.wall.count = n; tr.edge.count = n;
+        tr.wall.instanceMatrix.needsUpdate = true; tr.edge.instanceMatrix.needsUpdate = true;
+        if (tr.wall.instanceColor) tr.wall.instanceColor.needsUpdate = true;
+        if (tr.edge.instanceColor) tr.edge.instanceColor.needsUpdate = true;
+      }
+      updateFx(dt);
+
+      // camera
+      if (!tmpPos) { tmpPos = new THREE.Vector3(); tmpLook = new THREE.Vector3(); }
+      var p1 = cycles.riders[0];
+      if (useOverhead() || !p1) overheadTarget(tmpPos, tmpLook);
+      else chaseTarget(p1, tmpPos, tmpLook);
+      var k = 1 - Math.exp(-dt * (useOverhead() ? 3 : 6));
+      R3.camPos.lerp(tmpPos, k);
+      R3.camLook.lerp(tmpLook, 1 - Math.exp(-dt * 9));
+      R3.camera.position.copy(R3.camPos);
+      if (R3.shake > 0) {
+        var s = R3.shake * R3.shake * 0.9;
+        R3.camera.position.x += (Math.random() - 0.5) * s;
+        R3.camera.position.y += (Math.random() - 0.5) * s;
+        R3.camera.position.z += (Math.random() - 0.5) * s;
+        R3.shake = Math.max(0, R3.shake - dt * 1.6);
+      }
+      R3.camera.lookAt(R3.camLook);
+      R3.composer.render(dt);
+    }
+
+    /* ---------- main loop ---------- */
+    function frame(ts) {
+      var dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0.016;
+      lastTs = ts;
+      try {
+        if (mode === 'menu') {
+          drawSynthworld(dt, 0.55, COL.magenta);
+        } else if (mode === 'cycles' || mode === 'cycles-go' || mode === 'cycles-over') {
+          updateCycles(dt);
+          if (THREE) render3D(dt); else renderCycles2D();
+        } else if (mode === 'dodge' || mode === 'dodge-over') {
+          if (mode === 'dodge') updateDodge(dt);
+          else { dodge.shake = Math.max(0, dodge.shake - dt); dodge.flash = Math.max(0, dodge.flash - dt); }
+          renderDodge(dt);
+        }
+        if (!(THREE && mode.indexOf('cycles') === 0)) { updateParticles(dt); drawParticles(); }
+      } catch (err) {
+        console.error(err);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    /* ---------- boot ---------- */
+    window.__tronErrors = [];
+    window.addEventListener('error', function (e) { window.__tronErrors.push(String(e.message || e) + ' @' + e.lineno + ':' + e.colno); });
+    window.addEventListener('unhandledrejection', function (e) { window.__tronErrors.push('rejection: ' + e.reason); });
+    if (THREE) {
+      try { init3D(); } catch (err) { console.warn('WebGL init failed, using 2D fallback', err); THREE = null; R3 = null; }
+    }
+    showMenu();
+    var params = new URLSearchParams(location.search);
+    if (params.get('diff') && DIFFS[params.get('diff')]) difficulty = params.get('diff');
+    if (params.get('view') === 'overhead') viewMode = 'overhead';
+    if (params.get('autopilot')) autopilot = true;
+    if (params.get('dodgebot')) dodge.bot = true;
+    var boot = params.get('autostart') || '';
+    if (boot === 'cycles') startCycles(1);
+    if (boot === 'cycles2') startCycles(2);
+    if (boot === 'dodge') startDodge();
+    window.__game = {
+      get mode() { return mode; }, cycles: cycles, dodge: dodge, startCycles: startCycles, startDodge: startDodge,
+      setDifficulty: setDifficulty, toggleView: toggleView, dodgeSim: dodgeSim, has3D: function () { return !!R3; },
+      setAutopilot: function (v) { autopilot = !!v; }, setDodgeBot: function (v) { dodge.bot = !!v; }
+    };
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
